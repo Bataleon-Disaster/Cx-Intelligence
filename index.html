@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vendor Accountability Leaderboard</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Vendor Accountability Leaderboard</h1>
+    <p class="subtitle">Who is holding the programme back? &mdash; ranked by Total Overdue.</p>
+  </header>
+
+  <!-- Summary panel (populated in a later stage) -->
+  <section id="summary" class="summary" hidden></section>
+
+  <main>
+    <div id="status" class="status">Loading data&hellip;</div>
+    <table id="leaderboard" class="leaderboard" hidden>
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <!-- Drill-down panel (populated in a later stage) -->
+  <section id="drilldown" class="drilldown" hidden></section>
+
+  <!-- SheetJS, vendored locally so the app is fully offline/self-contained -->
+  <script src="vendor/xlsx.full.min.js"></script>
+  <!-- Shared, pure scoring logic (same module the Node acceptance test uses) -->
+  <script src="scoring.js"></script>
+  <!-- Browser app: load + parse the xlsx, then render -->
+  <script src="app.js"></script>
+</body>
+</html>
