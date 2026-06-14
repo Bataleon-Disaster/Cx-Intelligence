@@ -73,3 +73,34 @@ main {
 .leaderboard tbody tr:hover {
   background: var(--panel-2);
 }
+
+/* ---- Sortable headers ---- */
+.leaderboard th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.leaderboard th.sortable:hover {
+  color: var(--text);
+}
+
+.leaderboard th.active {
+  color: var(--accent);
+}
+
+/* ---- RAG colour badges ---- */
+.rag {
+  display: inline-block;
+  min-width: 64px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+  color: #0b1220;
+}
+
+.rag-red { background: #ef4444; color: #fff; }
+.rag-amber { background: #f59e0b; }
+.rag-green { background: #22c55e; }
