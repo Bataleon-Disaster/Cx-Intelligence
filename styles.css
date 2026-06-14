@@ -41,6 +41,37 @@ main {
   padding: 16px 0;
 }
 
+/* ---- Summary panel ---- */
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 8px 32px 0;
+}
+
+.card {
+  flex: 1 1 160px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.card-value {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.card-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.card-red .card-value { color: #ef4444; }
+.card-accent .card-value { color: var(--accent); }
+
 /* ---- Leaderboard table ---- */
 .leaderboard {
   width: 100%;

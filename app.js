@@ -122,7 +122,27 @@
       .join("");
   }
 
+  function renderSummary() {
+    const s = Scoring.summarize(state.scores);
+    const cards = [
+      { label: "Vendors", value: s.vendorCount, cls: "" },
+      { label: "In RED", value: s.redCount, cls: "card-red" },
+      { label: "Total Overdue (programme)", value: s.totalOverdue, cls: "card-accent" },
+      { label: "Total Open (programme)", value: s.totalOpen, cls: "" },
+    ];
+    const panel = $("#summary");
+    panel.innerHTML = cards
+      .map(
+        (c) =>
+          `<div class="card ${c.cls}"><div class="card-value">${c.value}</div>` +
+          `<div class="card-label">${c.label}</div></div>`
+      )
+      .join("");
+    panel.hidden = false;
+  }
+
   function render() {
+    renderSummary();
     renderHead();
     renderBody();
     $("#leaderboard").hidden = false;
