@@ -33,12 +33,20 @@
   const $ = (sel) => document.querySelector(sel);
   const clean = (v) => (v == null ? "" : String(v).trim());
 
-  // App state: the computed scores plus the current sort.
+  // App state: the computed scores, the raw registers (for drill-down), the
+  // current sort, and which vendor (if any) is expanded.
   const state = {
     scores: [],
+    registers: null,
     sortKey: "totalOverdue",
     sortDir: "desc",
+    selected: null,
   };
+
+  const escapeHtml = (v) =>
+    String(v == null ? "" : v).replace(/[&<>"']/g, (ch) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    }[ch]));
 
   async function loadWorkbook() {
     const res = await fetch(DATA_FILE);
@@ -117,7 +125,10 @@
       .map((s, i) => {
         const row = { ...s, rank: i + 1 };
         const tds = COLUMNS.map((c) => cellHtml(c, row)).join("");
-        return `<tr>${tds}</tr>`;
+        const sel = s.company === state.selected ? " selected" : "";
+        return `<tr class="vendor-row${sel}" tabindex="0" data-company="${escapeHtml(
+          s.company
+        )}">${tds}</tr>`;
       })
       .join("");
   }
@@ -139,6 +150,79 @@
       )
       .join("");
     panel.hidden = false;
+  }
+
+  function stateBadges(item) {
+    let html = "";
+    if (item.open) html += `<span class="pill pill-open">OPEN</span>`;
+    if (item.overdue)
+      html += `<span class="pill pill-overdue">OVERDUE ${item.daysOverdue}d</span>`;
+    return html;
+  }
+
+  function renderDrilldown(company) {
+    const panel = $("#drilldown");
+    const items = Scoring.vendorItems(company, state.registers);
+
+    const head =
+      `<div class="dd-header"><h2>${escapeHtml(company)} &mdash; items behind the score</h2>` +
+      `<button id="dd-close" class="dd-close" aria-label="Close">&times;</button></div>`;
+
+    let body;
+    if (items.length === 0) {
+      body = `<p class="dd-empty">No open or overdue items &mdash; this vendor is all clear. 🎉</p>`;
+    } else {
+      const rows = items
+        .map((it) => {
+          const cat = it.stage ? `${it.category} · ${it.stage}` : it.category;
+          return (
+            "<tr>" +
+            `<td>${escapeHtml(it.register)}</td>` +
+            `<td>${escapeHtml(it.id)}</td>` +
+            `<td>${escapeHtml(cat)}</td>` +
+            `<td>${escapeHtml(it.status)}</td>` +
+            `<td>${escapeHtml(it.priority || "—")}</td>` +
+            `<td>${escapeHtml(it.dueDate)}</td>` +
+            `<td class="num">${it.daysOverdue}</td>` +
+            `<td>${stateBadges(it)}</td>` +
+            "</tr>"
+          );
+        })
+        .join("");
+      body =
+        `<p class="dd-count">${items.length} item(s) driving this vendor's open/overdue scores.</p>` +
+        `<table class="detail"><thead><tr>` +
+        `<th>Register</th><th>ID</th><th>System / Type</th><th>Status</th>` +
+        `<th>Priority</th><th>Due Date</th><th class="num">Days Overdue</th><th>State</th>` +
+        `</tr></thead><tbody>${rows}</tbody></table>`;
+    }
+
+    panel.innerHTML = head + body;
+    panel.hidden = false;
+    $("#dd-close").addEventListener("click", closeDrilldown);
+  }
+
+  function selectVendor(company) {
+    state.selected = company;
+    renderBody(); // refresh row highlight
+    renderDrilldown(company);
+    $("#drilldown").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  function closeDrilldown() {
+    state.selected = null;
+    $("#drilldown").hidden = true;
+    renderBody();
+  }
+
+  function onRowActivate(e) {
+    const tr = e.target.closest("tr.vendor-row");
+    if (!tr) return;
+    if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+    if (e.type === "keydown") e.preventDefault();
+    const company = tr.dataset.company;
+    if (company === state.selected) closeDrilldown();
+    else selectVendor(company);
   }
 
   function render() {
@@ -167,8 +251,12 @@
     const status = $("#status");
     try {
       const { registers, vendors } = await loadWorkbook();
+      state.registers = registers;
       state.scores = Scoring.computeScores(vendors, registers);
       $("#leaderboard thead").addEventListener("click", onHeadClick);
+      const tbody = $("#leaderboard tbody");
+      tbody.addEventListener("click", onRowActivate);
+      tbody.addEventListener("keydown", onRowActivate);
       render();
       status.hidden = true;
     } catch (err) {

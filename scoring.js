@@ -95,6 +95,50 @@
     return vendors.map((v) => scoreVendor(v, registers));
   }
 
+  // Per-register metadata for the drill-down: which columns to read and label.
+  // `openKey` is the register key for isOpen(); null means the register has no
+  // "open" concept in the scorecard (QAQC is overdue-only).
+  const REGISTER_META = {
+    obs: { label: "Observation", idField: "Obs ID", catField: "System", openKey: "obs" },
+    punch: { label: "Punch", idField: "Punch ID", catField: "System", openKey: "punch" },
+    actions: { label: "Action", idField: "Action ID", catField: "Type", openKey: "actions" },
+    qaqc: { label: "QA/QC", idField: "Item ID", catField: "System", openKey: null },
+  };
+
+  // Records behind a vendor's score: every item that counts toward a displayed
+  // column (open Obs/Punch/Actions, or overdue in any register).
+  function vendorItems(company, registers) {
+    const c = clean(company);
+    const items = [];
+    for (const regKey of Object.keys(REGISTER_META)) {
+      const meta = REGISTER_META[regKey];
+      for (const r of registers[regKey]) {
+        if (clean(r.Company) !== c) continue;
+        const open = meta.openKey ? isOpen(meta.openKey, r.Status) : false;
+        const overdue = isOverdue(r["Days Overdue"]);
+        if (!open && !overdue) continue; // not behind any counted column
+        items.push({
+          register: meta.label,
+          id: r[meta.idField],
+          category: clean(r[meta.catField]),
+          stage: clean(r.Stage), // QAQC only; "" elsewhere
+          status: clean(r.Status),
+          priority: clean(r.Priority), // "" for QAQC
+          dueDate: clean(r["Due Date"]),
+          daysOverdue: Number(r["Days Overdue"]) || 0,
+          open,
+          overdue,
+        });
+      }
+    }
+    // Overdue first (most overdue at top), then the rest.
+    items.sort((a, b) => {
+      if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
+      return b.daysOverdue - a.daysOverdue;
+    });
+    return items;
+  }
+
   // Default ranking: worst (most overdue) first.
   function rankScores(scores) {
     return scores.slice().sort((a, b) => {
@@ -122,5 +166,6 @@
     computeScores,
     rankScores,
     summarize,
+    vendorItems,
   };
 });

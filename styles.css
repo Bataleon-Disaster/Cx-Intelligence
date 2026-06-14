@@ -135,3 +135,82 @@ main {
 .rag-red { background: #ef4444; color: #fff; }
 .rag-amber { background: #f59e0b; }
 .rag-green { background: #22c55e; }
+
+/* ---- Clickable vendor rows ---- */
+.leaderboard tbody tr.vendor-row {
+  cursor: pointer;
+}
+
+.leaderboard tbody tr.selected {
+  background: var(--panel-2);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+/* ---- Drill-down panel ---- */
+.drilldown {
+  margin: 8px 32px 48px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.dd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dd-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.dd-close {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.dd-close:hover { color: var(--text); }
+
+.dd-count, .dd-empty {
+  color: var(--muted);
+  margin: 6px 0 12px;
+}
+
+.detail {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.detail th, .detail td {
+  text-align: left;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.detail th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.detail .num { text-align: right; }
+
+/* ---- Item state pills ---- */
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  margin-right: 4px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pill-open { background: #334155; color: #cbd5e1; }
+.pill-overdue { background: #ef4444; color: #fff; }
