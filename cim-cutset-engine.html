@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+<title>CIM Cut-Set Engine — proof-driven commissioning</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --ink:#e9eef7; --muted:#9fb0c9;
+    --line:#22304c; --accent:#3b82f6;
+    --red:#ef4444; --red-bg:#3b1417; --amber:#f59e0b; --amber-bg:#3a2a0d;
+    --grey:#64748b; --grey-bg:#1b2538; --green:#22c55e; --green-bg:#10301c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;}
+  a{color:var(--accent)}
+  header{padding:14px 16px;background:linear-gradient(180deg,#0d1830,#0b1220);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+  header h1{margin:0;font-size:17px;letter-spacing:.2px}
+  header .sub{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.4}
+  main{max-width:1100px;margin:0 auto;padding:12px 12px 64px}
+  section{margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+  .row{display:flex;gap:10px;flex-wrap:wrap}
+  .grow{flex:1 1 280px}
+
+  /* COP banner */
+  .banner{border-radius:12px;padding:16px;text-align:center;font-weight:800;
+    font-size:22px;letter-spacing:.5px;border:1px solid transparent}
+  .banner.ok{background:var(--green-bg);color:#7ef0a8;border-color:#1c5236}
+  .banner.lost{background:var(--red-bg);color:#ff9aa0;border-color:#7a2228}
+  .banner small{display:block;font-weight:600;font-size:12px;letter-spacing:.3px;margin-top:6px;color:var(--muted)}
+
+  /* coverage */
+  .coverage{display:flex;gap:10px;flex-wrap:wrap;align-items:stretch}
+  .metric{flex:1 1 160px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .metric .big{font-size:24px;font-weight:800}
+  .metric .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+  .bar{height:10px;background:#0a1322;border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:8px}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#22c55e,#16a34a)}
+  .spofchip{display:inline-flex;align-items:center;gap:6px;font-weight:800;font-size:13px;
+    background:var(--red-bg);color:#ff9aa0;border:1px solid #7a2228;border-radius:99px;padding:4px 10px}
+  .spofchip.zero{background:var(--green-bg);color:#7ef0a8;border-color:#1c5236}
+
+  /* buttons */
+  .btn{appearance:none;border:1px solid var(--line);background:#16233d;color:var(--ink);
+    border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#1d2f50}
+  .btn.primary{background:#1d4ed8;border-color:#2a5bd0}
+  .btn.ghost{background:transparent}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* diagram */
+  .diagram-wrap{position:relative;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+  svg#diagram{display:block;width:100%;height:auto;min-width:560px;touch-action:none}
+  .hint{font-size:11.5px;color:var(--muted);margin:6px 2px 0}
+
+  /* legend */
+  .legend{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
+
+  /* cut-set panel */
+  .grp{margin-bottom:14px}
+  .grp-h{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;font-weight:800;font-size:13px}
+  .grp-h.o1{background:var(--red-bg);color:#ff9aa0;border:1px solid #7a2228}
+  .grp-h.o2{background:var(--amber-bg);color:#f7c768;border:1px solid #6a4d12}
+  .grp-h.o3{background:var(--grey-bg);color:#aebbd1;border:1px solid #33415e}
+  .grp-h .count{margin-left:auto;background:rgba(0,0,0,.25);border-radius:99px;padding:1px 9px;font-size:12px}
+  .cut{display:block;width:100%;text-align:left;margin-top:8px;background:var(--panel2);
+    border:1px solid var(--line);border-left-width:4px;border-radius:9px;padding:9px 11px;cursor:pointer;color:var(--ink)}
+  .cut:hover{background:#13203a}
+  .cut.o1{border-left-color:var(--red)}
+  .cut.o2{border-left-color:var(--amber)}
+  .cut.o3{border-left-color:var(--grey)}
+  .cut.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin:2px 0 6px}
+  .chip{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid rgba(255,255,255,.18);color:#fff}
+  .req{font-size:12.5px;color:var(--muted);line-height:1.45}
+  .req b{color:var(--ink)}
+  .empty{color:var(--muted);font-size:12.5px;font-style:italic;padding:6px 2px}
+
+  /* matrix table */
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;min-width:760px;font-size:12.5px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+  th{position:sticky;top:0;background:#0e1830;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px}
+  tr.o1 td:first-child{border-left:3px solid var(--red)}
+  tr.o2 td:first-child{border-left:3px solid var(--amber)}
+  tr.o3 td:first-child{border-left:3px solid var(--grey)}
+  td .ord{font-weight:800}
+  .pid{width:120px;background:#0a1322;border:1px solid var(--line);color:var(--ink);border-radius:7px;padding:5px 7px;font-size:12px}
+  select.state{border-radius:7px;padding:5px 7px;font-size:12px;border:1px solid var(--line);font-weight:700}
+  select.state.s-dem{background:var(--green-bg);color:#7ef0a8}
+  select.state.s-ass{background:var(--amber-bg);color:#f7c768}
+  select.state.s-not{background:var(--grey-bg);color:#aebbd1}
+
+  /* assumptions / editor */
+  details{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 12px}
+  details > summary{cursor:pointer;padding:11px 0;font-weight:700;font-size:13px;list-style:none}
+  details > summary::-webkit-details-marker{display:none}
+  details > summary::before{content:"▸ ";color:var(--muted)}
+  details[open] > summary::before{content:"▾ "}
+  details .body{padding:0 0 12px}
+  ul.notes{margin:6px 0;padding-left:18px}
+  ul.notes li{margin:4px 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+  ul.notes li b{color:var(--ink)}
+  .confirm{color:#f7c768;font-weight:700}
+  code{background:#0a1322;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:11.5px}
+  textarea{width:100%;min-height:120px;background:#0a1322;color:var(--ink);border:1px solid var(--line);
+    border-radius:8px;padding:9px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;resize:vertical}
+  .msg{font-size:12px;margin-top:6px}
+  .msg.err{color:#ff9aa0}
+  .msg.ok{color:#7ef0a8}
+  .scn{font-size:12px;color:var(--muted);margin-top:8px}
+  .scn b{color:var(--ink)}
+  .ipnote{font-size:11px;color:var(--grey);text-align:center;margin:18px 0 0}
+
+  @media (max-width:560px){
+    .banner{font-size:18px}
+    header h1{font-size:15px}
+  }
+  @media print{
+    header{position:static}
+    .noprint{display:none !important}
+    body{background:#fff;color:#000}
+    .card,details{border-color:#bbb;background:#fff;color:#000}
+    .diagram-wrap{overflow:visible;border-color:#bbb}
+    svg#diagram{min-width:0}
+    .req,.metric .lbl,.hint{color:#333}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>CIM Cut-Set Engine <span style="color:var(--muted);font-weight:500">· proof-driven commissioning</span></h1>
+  <p class="sub">LHR095 B-side / catcher-spine → COP. The model is <b>proved</b> from the as-built topology;
+  the proof tells you exactly what must be tested. Tap a node to fail it · tap a cut set to demonstrate it.</p>
+</header>
+
+<main>
+
+  <!-- =================== TOPOLOGY (single editable object) =================== -->
+  <!--
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │  EDIT WIRING HERE. This is the ONE place the topology lives.               │
+    │  NODE FACTS are verified/locked. EDGES are ILLUSTRATIVE — CONFIRM AGAINST  │
+    │  THE SINGLE-LINE. The seed edges deliberately funnel both catcher buses    │
+    │  through one ATS (AMCOP) and one breaker (CUPP-MBP) so the engine reveals  │
+    │  a found single point of failure on first run. Fix the edges to feed the   │
+    │  two buses from independent paths and watch the order-1 cut sets vanish.   │
+    └──────────────────────────────────────────────────────────────────────────┘
+  -->
+  <script id="topology">
+  window.TOPOLOGY = {
+    load: "COP",          // the critical load whose supply we are proving
+    maxOrder: 3,          // enumerate minimal cut sets up to this order
+
+    // id, type, label, commissioned
+    // types: source | ats | protection | breaker | ups | transformer | bus | passive | load
+    nodes: [
+      { id:"MEDS_1",    type:"source",      label:"MEDS mains feed",                                                        commissioned:true  },
+      { id:"MEDS_2",    type:"source",      label:"MEDS mains feed",                                                        commissioned:true  },
+      { id:"GEN_1",     type:"source",      label:"Generator",                                                              commissioned:true  },
+      { id:"GEN_2",     type:"source",      label:"Generator",                                                              commissioned:true  },
+      { id:"AMCOP",     type:"ats",         label:"AMCOP — 3-source ATS, electro-mechanical interlock, between MEDS and GEN", commissioned:true },
+      { id:"DLB",       type:"protection",  label:"DLB load-shed (DAC/LAC controllers), generator protection",             commissioned:true  },
+      { id:"CUPP_MBP",  type:"breaker",     label:"CUPP-MBP main breaker panel",                                            commissioned:true  },
+      { id:"CUPS",      type:"ups",         label:"CUPS",                                                                   commissioned:true  },
+      { id:"CUPP_XFMR", type:"transformer", label:"CUPP-XFMR",                                                              commissioned:true  },
+      { id:"BUS_1_1C",  type:"bus",         label:"BUS 1.1C — catcher spine, feeds COP only",                               commissioned:true  },
+      { id:"BUS_2_1C",  type:"bus",         label:"BUS 2.1C — catcher spine, feeds COP + every MEDS lifeboat tap",          commissioned:true  },
+      { id:"GENAN",     type:"passive",     label:"GENAN switchgear furniture — NOT a commissioned asset",                  commissioned:false },
+      { id:"COP",       type:"load",        label:"COP — critical load",                                                    commissioned:true  }
+    ],
+
+    // directed power flow: [from, to]   — ILLUSTRATIVE — CONFIRM AGAINST SINGLE-LINE
+    edges: [
+      ["MEDS_1","AMCOP"], ["MEDS_2","AMCOP"], ["GEN_1","AMCOP"], ["GEN_2","AMCOP"],   // CONFIRM: 3-source ATS inputs
+      ["AMCOP","CUPP_MBP"],                                                            // CONFIRM: single funnel through AMCOP
+      ["CUPP_MBP","CUPS"], ["CUPP_MBP","CUPP_XFMR"],                                   // CONFIRM: MBP feeds CUPS + XFMR in PARALLEL
+      ["CUPS","BUS_1_1C"], ["CUPS","BUS_2_1C"],                                        // CONFIRM: UPS feeds both catcher buses
+      ["CUPP_XFMR","BUS_1_1C"], ["CUPP_XFMR","BUS_2_1C"],                              // CONFIRM: XFMR feeds both catcher buses
+      ["BUS_1_1C","COP"], ["BUS_2_1C","COP"]                                           // LOCKED: COP fed ONLY by the two catcher buses
+    ]
+  };
+  </script>
+
+  <!-- COP banner -->
+  <section>
+    <div id="copBanner" class="banner ok">COP SUPPLIED</div>
+    <div id="scenario" class="scn"></div>
+  </section>
+
+  <!-- Coverage -->
+  <section class="card">
+    <h2>Redundancy-proof coverage (order ≤ 2)</h2>
+    <div class="coverage">
+      <div class="metric">
+        <div id="covPct" class="big">—</div>
+        <div class="lbl">order ≤ 2 proofs demonstrated</div>
+        <div class="bar"><i id="covBar" style="width:0%"></i></div>
+      </div>
+      <div class="metric">
+        <div id="covCounts" class="big">—</div>
+        <div class="lbl">demonstrated / total proofs</div>
+        <div id="covBreak" class="lbl" style="margin-top:8px;text-transform:none">&nbsp;</div>
+      </div>
+      <div class="metric" style="display:flex;flex-direction:column;justify-content:center;gap:8px">
+        <span id="spofChip" class="spofchip zero">✓ 0 single points of failure</span>
+        <div class="lbl" style="text-transform:none">A 2N / N+1 design must have <b>zero</b> order-1 cut sets.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Diagram -->
+  <section class="card">
+    <div class="toolbar noprint" style="margin-bottom:8px">
+      <h2 style="margin:0;flex:1 1 auto">Topology — directed power flow</h2>
+      <button class="btn ghost" id="btnReset">Reset scenario</button>
+      <button class="btn ghost" id="btnRelayout">Re-layout</button>
+      <button class="btn" id="btnPng">Export PNG</button>
+      <button class="btn" id="btnPrint">Print / Save PDF</button>
+    </div>
+    <div class="diagram-wrap">
+      <svg id="diagram" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <p class="hint noprint">Tap a node to toggle it failed (red ✕). Passive furniture and the load can't be failed.
+      Drag a node to untangle. Tap a cut set below to stage exactly that failure set.</p>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- Cut-set panel -->
+  <section class="card">
+    <h2>Minimal cut sets — the proof set</h2>
+    <div id="cutsets"></div>
+  </section>
+
+  <!-- Test matrix -->
+  <section class="card">
+    <h2>Commissioning test matrix — each cut set is a requirement</h2>
+    <div class="tablewrap">
+      <table id="matrix">
+        <thead><tr>
+          <th>Scenario</th><th>Expected outcome</th><th>Assets involved</th><th>Procore test ID</th><th>State</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Procore overlay -->
+  <section class="card noprint">
+    <h2>Procore overlay — paste test status</h2>
+    <p class="req">Paste CSV rows <code>asset_id, test_status</code> (one per line). Status maps to
+      <b>Demonstrated</b> / <b>Assumed</b> / <b>Not yet tested</b>. A cut set's proof is only as strong as its
+      <b>weakest</b> involved asset, so each row takes the worst status among its assets. You can still override any row manually above.</p>
+    <textarea id="csv" spellcheck="false" placeholder="AMCOP, demonstrated
+CUPP_MBP, assumed
+CUPS, demonstrated
+CUPP_XFMR, not yet tested
+BUS_1_1C, demonstrated
+BUS_2_1C, demonstrated"></textarea>
+    <div class="toolbar" style="margin-top:8px">
+      <button class="btn primary" id="btnApplyCsv">Apply CSV</button>
+      <button class="btn ghost" id="btnSample">Load sample</button>
+      <button class="btn ghost" id="btnClearStates">Reset all to “Not yet tested”</button>
+    </div>
+    <div id="csvMsg" class="msg"></div>
+  </section>
+
+  <!-- Assumptions -->
+  <section class="noprint">
+    <details open>
+      <summary>Modelling assumptions — confirm these</summary>
+      <div class="body">
+        <ul class="notes">
+          <li><span class="confirm">CONFIRM AGAINST SINGLE-LINE.</span> The edges below are <b>illustrative</b>. They deliberately
+            funnel both catcher buses through <b>one ATS (AMCOP)</b> and <b>one breaker (CUPP-MBP)</b> so the engine reveals a
+            found single point of failure on first run.</li>
+          <li><b>Illustrative edges:</b> MEDS_1/MEDS_2/GEN_1/GEN_2 → AMCOP; AMCOP → CUPP-MBP;
+            CUPP-MBP → CUPS &amp; CUPP-XFMR (parallel); CUPS → BUS_1.1C &amp; BUS_2.1C;
+            CUPP-XFMR → BUS_1.1C &amp; BUS_2.1C; BUS_1.1C &amp; BUS_2.1C → COP.</li>
+          <li><b>DLB simplification:</b> DLB load-shed (DAC/LAC) / generator protection is modelled as a <b>commissioned node
+            with no power-path edges</b> — it does not gate COP supply in this graph, so it never appears in a cut set. If DLB
+            mis-operation can actually trip the supply, add the appropriate edge and re-run.</li>
+          <li><b>GENAN</b> is passive switchgear furniture (<code>commissioned:false</code>) — excluded as a fault candidate and
+            treated as always-up structure; shown off the power path.</li>
+          <li><b>Locked facts:</b> COP is fed <b>only</b> by the catcher buses BUS_1.1C / BUS_2.1C and survives if ≥1 is live.
+            BUS_2.1C also feeds every MEDS lifeboat tap. CUPP-MBP feeds CUPS and CUPP-XFMR in <b>parallel</b>.
+            AMCOP passes power if it is up and any input source reaches it. This is the <b>B-side</b> critical-path model.</li>
+          <li><b>Candidates:</b> fault candidates = nodes with <code>commissioned:true</code>, excluding the load itself
+            (the load failing is not a supply-path cut). Minimal cut sets are enumerated to order <span id="maxOrderNote">3</span>.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <!-- Live topology editor -->
+  <section class="noprint">
+    <details>
+      <summary>Edit topology (JSON) — correct the wiring without touching the logic</summary>
+      <div class="body">
+        <p class="req">Edit nodes/edges and Apply to re-prove live. To make the order-1 cut sets disappear, feed the two
+          catcher buses from <b>independent</b> upstream paths instead of one shared AMCOP / CUPP-MBP.</p>
+        <textarea id="topoEdit" spellcheck="false"></textarea>
+        <div class="toolbar" style="margin-top:8px">
+          <button class="btn primary" id="btnApplyTopo">Apply topology</button>
+          <button class="btn ghost" id="btnRevertTopo">Revert to seed</button>
+        </div>
+        <div id="topoMsg" class="msg"></div>
+      </div>
+    </details>
+  </section>
+
+  <p class="ipnote">Personal methodology IP — standalone tool. Not for embedding in any client or third-party system.</p>
+
+</main>
+
+<script>
+"use strict";
+/* ============================================================================
+   CIM CUT-SET ENGINE
+   A directed reliability graph → exhaustive minimal cut-set enumeration →
+   commissioning test requirements → test-completion overlay.
+   ========================================================================== */
+
+const SEED = JSON.parse(JSON.stringify(window.TOPOLOGY)); // immutable seed copy
+
+/* ---- type styling (presentation attributes inline so PNG export is faithful) ---- */
+const TYPE = {
+  source:      { fill:"#0f766e", name:"Source (MEDS / Generator)" },
+  ats:         { fill:"#c2410c", name:"ATS (auto transfer switch)" },
+  protection:  { fill:"#6d28d9", name:"Protection / load-shed" },
+  breaker:     { fill:"#be123c", name:"Breaker panel" },
+  ups:         { fill:"#4d7c0f", name:"UPS" },
+  transformer: { fill:"#a16207", name:"Transformer" },
+  bus:         { fill:"#1d4ed8", name:"Busduct / catcher spine" },
+  load:        { fill:"#0b1220", name:"Critical load (COP)" },
+  passive:     { fill:"#6b7280", name:"Passive furniture (excluded)" }
+};
+
+/* ---- live state ---- */
+let topo = JSON.parse(JSON.stringify(SEED));
+let idx = null;            // index built from topo
+let cutResult = null;      // {byOrder, all}
+let pos = {};              // id -> {x,y}  layout positions
+const state = {
+  down: new Set(),         // currently-failed nodes (manual / staged scenario)
+  selected: null,          // selected cut-set id (highlight)
+  testState: {},           // cutId -> "Demonstrated" | "Assumed" | "Not yet tested"
+  procoreId: {}            // cutId -> string
+};
+
+/* ============================ ENGINE ====================================== */
+
+function buildIndex(t){
+  const byId = new Map();
+  t.nodes.forEach(n => byId.set(n.id, n));
+  const out = new Map(), inn = new Map();
+  t.nodes.forEach(n => { out.set(n.id, []); inn.set(n.id, []); });
+  t.edges.forEach(([s,d]) => {
+    if (byId.has(s) && byId.has(d)) { out.get(s).push(d); inn.get(d).push(s); }
+  });
+  return { byId, out, inn };
+}
+
+// Passive nodes (commissioned:false) are always up. A candidate node is up iff not in downSet.
+function isUp(id, downSet){
+  const n = idx.byId.get(id);
+  if (!n) return false;
+  if (n.commissioned === false) return true; // passive structure: always up
+  return !downSet.has(id);
+}
+
+// true iff a directed path of UP nodes reaches the load from any UP source.
+function isLoadSupplied(loadId, downSet){
+  if (!isUp(loadId, downSet)) return false;
+  const seen = new Set();
+  const q = [];
+  for (const n of idx.byId.values()){
+    if (n.type === "source" && isUp(n.id, downSet)) { seen.add(n.id); q.push(n.id); }
+  }
+  while (q.length){
+    const cur = q.shift();
+    if (cur === loadId) return true;
+    for (const nxt of (idx.out.get(cur) || [])){
+      if (!seen.has(nxt) && isUp(nxt, downSet)) { seen.add(nxt); q.push(nxt); }
+    }
+  }
+  return seen.has(loadId);
+}
+
+// Explicit iterative k-combination builder (small N — exhaustive is fine).
+function combinations(arr, k){
+  const res = [], c = [];
+  (function rec(start){
+    if (c.length === k){ res.push(c.slice()); return; }
+    for (let i = start; i <= arr.length - (k - c.length); i++){
+      c.push(arr[i]); rec(i + 1); c.pop();
+    }
+  })(0);
+  return res;
+}
+
+function isSubsetOf(small, big){ // small/big are Sets
+  for (const x of small) if (!big.has(x)) return false;
+  return true;
+}
+
+// Exhaustive minimal cut-set enumeration to maxOrder. Candidates = commissioned nodes
+// except the load (the load failing is not a supply-path cut).
+function findMinimalCutSets(loadId, maxOrder){
+  const candidates = [];
+  for (const n of idx.byId.values()){
+    if (n.commissioned === true && n.id !== loadId) candidates.push(n.id);
+  }
+  candidates.sort();
+  const recorded = [];                 // [{order, members:Set, arr:[]}]
+  const byOrder = {};
+  for (let k = 1; k <= maxOrder; k++) byOrder[k] = [];
+
+  for (let k = 1; k <= maxOrder; k++){
+    for (const combo of combinations(candidates, k)){
+      const members = new Set(combo);
+      // minimality: skip if any already-recorded (smaller) cut set is a subset
+      let dominated = false;
+      for (const rc of recorded){
+        if (rc.members.size < members.size && isSubsetOf(rc.members, members)){ dominated = true; break; }
+      }
+      if (dominated) continue;
+      if (!isLoadSupplied(loadId, members)){
+        const rec = { order:k, members, arr:combo.slice(), id: k + ":" + combo.slice().sort().join("+") };
+        recorded.push(rec);
+        byOrder[k].push(rec);
+      }
+    }
+  }
+  return { byOrder, all:recorded };
+}
+
+/* ===================== requirement text per cut set ====================== */
+function labelsOf(rec){ return rec.arr.map(id => idx.byId.get(id).label); }
+function shortLabel(id){
+  // a compact human tag for chips/tables
+  const map = { BUS_1_1C:"BUS 1.1C", BUS_2_1C:"BUS 2.1C", CUPP_MBP:"CUPP-MBP", CUPP_XFMR:"CUPP-XFMR" };
+  return map[id] || id;
+}
+function requirementFor(rec){
+  const L = rec.arr.map(shortLabel);
+  if (rec.order === 1){
+    return {
+      scenario: "Fail " + L[0],
+      expected: "COP LOST — SINGLE POINT OF FAILURE. No surviving supply path. Eliminate the dependency or formally accept it via design review."
+    };
+  }
+  if (rec.order === 2){
+    return {
+      scenario: "Fail " + L[0] + " (then independently fail " + L[1] + ")",
+      expected: "COP must remain SUPPLIED via " + L[1] + " when " + L[0] + " is failed, and via " + L[0] + " when "
+              + L[1] + " is failed. Simultaneous " + L[0] + " + " + L[1] + " is the redundancy-defeating double fault."
+    };
+  }
+  return {
+    scenario: "Fail " + L.join(" + "),
+    expected: "Remote " + rec.order + "-fault: COP lost only if all of " + L.join(", ") + " fail. De-prioritised — verify by analysis."
+  };
+}
+
+/* ============================ LAYOUT ===================================== */
+// Layered top-down layout: rank = longest path from a source. Orphans (no edges)
+// drop to a separate "off-path" lane so DLB / GENAN don't masquerade as sources.
+function computeLayout(){
+  const ROWGAP = 112, MARGIN = 46, BOXW = 168, BOXH = 50;
+  const ranks = new Map();
+  const orphans = [];
+  for (const n of topo.nodes){
+    const hasIn = idx.inn.get(n.id).length > 0;
+    const hasOut = idx.out.get(n.id).length > 0;
+    if (!hasIn && !hasOut) { orphans.push(n.id); continue; }
+    ranks.set(n.id, n.type === "source" ? 0 : -1);
+  }
+  // relax longest-path; cap iterations to guard against any cycles
+  for (let it = 0; it < topo.nodes.length + 2; it++){
+    let changed = false;
+    for (const [s,d] of topo.edges){
+      if (!ranks.has(s) || !ranks.has(d)) continue;
+      const rs = ranks.get(s);
+      if (rs >= 0 && ranks.get(d) < rs + 1){ ranks.set(d, rs + 1); changed = true; }
+    }
+    if (!changed) break;
+  }
+  let maxRank = 0;
+  for (const v of ranks.values()) if (v > maxRank) maxRank = v;
+  ranks.forEach((v,k) => { if (v < 0) ranks.set(k, 0); }); // unreachable → top
+
+  // bucket by rank
+  const rows = {};
+  ranks.forEach((r,id) => { (rows[r] = rows[r] || []).push(id); });
+  let maxRowCount = 1;
+  Object.values(rows).forEach(a => { if (a.length > maxRowCount) maxRowCount = a.length; });
+  maxRowCount = Math.max(maxRowCount, orphans.length);
+
+  const W = Math.max(900, maxRowCount * (BOXW + 28));
+  const totalRows = maxRank + 1 + (orphans.length ? 1 : 0);
+  const H = MARGIN * 2 + (totalRows) * ROWGAP - (ROWGAP - BOXH);
+
+  pos = {};
+  Object.keys(rows).map(Number).sort((a,b)=>a-b).forEach(r => {
+    const ids = rows[r].slice().sort();
+    ids.forEach((id,i) => {
+      pos[id] = { x: (i + 0.5) / ids.length * W, y: MARGIN + r * ROWGAP + BOXH/2 };
+    });
+  });
+  orphans.sort().forEach((id,i) => {
+    pos[id] = { x: (i + 0.5) / orphans.length * W, y: MARGIN + (maxRank + 1) * ROWGAP + BOXH/2, orphan:true };
+  });
+
+  return { W, H, BOXW, BOXH, orphanY: orphans.length ? MARGIN + (maxRank + 1) * ROWGAP : null };
+}
+
+/* ============================ RENDER DIAGRAM ============================= */
+let LAYOUT = null;
+function wrap(text, max){
+  const words = text.split(/\s+/), lines = []; let cur = "";
+  for (const w of words){
+    if ((cur + " " + w).trim().length > max){ if (cur) lines.push(cur); cur = w; }
+    else cur = (cur + " " + w).trim();
+  }
+  if (cur) lines.push(cur);
+  return lines.slice(0, 3); // cap to keep boxes tidy
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+function renderDiagram(){
+  const svg = document.getElementById("diagram");
+  LAYOUT = computeLayout();
+  const { W, H, BOXW, BOXH, orphanY } = LAYOUT;
+  const sel = state.selected ? cutResult.all.find(r => r.id === state.selected) : null;
+  const hi = sel ? sel.members : new Set();
+
+  let s = "";
+  s += `<defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#7c8db0"/>
+    </marker>
+    <marker id="arrowDead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#5a2230"/>
+    </marker>
+  </defs>`;
+
+  if (orphanY !== null){
+    s += `<line x1="0" y1="${orphanY-22}" x2="${W}" y2="${orphanY-22}" stroke="#33415e" stroke-dasharray="4 5"/>`;
+    s += `<text x="10" y="${orphanY-28}" fill="#64748b" font-size="11" font-family="sans-serif">Not on modelled power path (DLB simplification · passive furniture)</text>`;
+  }
+
+  // edges
+  for (const [a,b] of topo.edges){
+    if (!pos[a] || !pos[b]) continue;
+    const dead = state.down.has(a) || state.down.has(b);
+    const pa = pos[a], pb = pos[b];
+    const x1 = pa.x, y1 = pa.y + BOXH/2, x2 = pb.x, y2 = pb.y - BOXH/2;
+    s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+      stroke="${dead ? '#5a2230' : '#7c8db0'}" stroke-width="${dead?1.4:1.8}" ${dead?'stroke-dasharray="4 4"':''}
+      marker-end="url(#${dead?'arrowDead':'arrow'})"/>`;
+  }
+
+  // nodes
+  for (const n of topo.nodes){
+    const p = pos[n.id]; if (!p) continue;
+    const t = TYPE[n.type] || TYPE.passive;
+    const failed = state.down.has(n.id);
+    const isHi = hi.has(n.id);
+    const passive = n.commissioned === false;
+    const x = p.x - BOXW/2, y = p.y - BOXH/2;
+    const lines = wrap((shortLabel(n.id)) + " · " + n.label, 30);
+    const fill = t.fill;
+    const stroke = isHi ? "#fbbf24" : (failed ? "#ef4444" : "rgba(255,255,255,.28)");
+    const sw = isHi ? 3.5 : (failed ? 3 : 1.2);
+    const op = passive ? 0.55 : (failed ? 0.5 : 1);
+    const dash = passive ? `stroke-dasharray="5 4"` : "";
+    s += `<g class="node" data-id="${esc(n.id)}" style="cursor:pointer">`;
+    s += `<title>${esc(n.id)} · ${esc(n.label)}${passive ? " (passive — not a fault candidate)" : ""}${failed ? " — FAILED" : ""}</title>`;
+    s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" rx="9" width="${BOXW}" height="${BOXH}"
+            fill="${fill}" fill-opacity="${op}" stroke="${stroke}" stroke-width="${sw}" ${dash}/>`;
+    // label text
+    const lh = 12, startY = p.y - (lines.length-1)*lh/2 + 1;
+    lines.forEach((ln,i) => {
+      s += `<text x="${p.x.toFixed(1)}" y="${(startY + i*lh).toFixed(1)}" text-anchor="middle"
+              font-family="sans-serif" font-size="10" font-weight="${i===0?700:500}"
+              fill="#ffffff" fill-opacity="${passive?0.85:0.97}">${esc(ln)}</text>`;
+    });
+    if (failed){
+      // red ✕ badge
+      s += `<circle cx="${(x+BOXW-9).toFixed(1)}" cy="${(y+9).toFixed(1)}" r="8" fill="#ef4444"/>`;
+      s += `<text x="${(x+BOXW-9).toFixed(1)}" y="${(y+12.5).toFixed(1)}" text-anchor="middle" font-family="sans-serif" font-size="11" font-weight="800" fill="#fff">✕</text>`;
+    }
+    s += `</g>`;
+  }
+
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W);          // intrinsic size → CSS width:100%;height:auto scales it responsively
+  svg.setAttribute("height", H);
+  svg.setAttribute("preserveAspectRatio", "xMidYMin meet");
+  svg.innerHTML = s;
+
+  attachNodeHandlers(svg);
+}
+
+/* node interaction: tap = toggle fail; drag = reposition */
+function svgPoint(svg, clientX, clientY){
+  const pt = svg.createSVGPoint(); pt.x = clientX; pt.y = clientY;
+  const ctm = svg.getScreenCTM(); if (!ctm) return { x:0, y:0 };
+  const p = pt.matrixTransform(ctm.inverse()); return { x:p.x, y:p.y };
+}
+function attachNodeHandlers(svg){
+  svg.querySelectorAll("g.node").forEach(g => {
+    const id = g.getAttribute("data-id");
+    let moved = false, start = null, offset = null;
+    const onMove = (ev) => {
+      const e = ev.touches ? ev.touches[0] : ev;
+      const sp = svgPoint(svg, e.clientX, e.clientY);
+      if (start && (Math.abs(sp.x-start.x) > 5 || Math.abs(sp.y-start.y) > 5)) moved = true;
+      if (moved && pos[id]){ pos[id].x = sp.x - offset.x; pos[id].y = sp.y - offset.y; renderDiagram(); }
+    };
+    const onUp = () => {
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+      if (!moved) toggleNode(id);
+    };
+    g.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      moved = false;
+      start = svgPoint(svg, ev.clientX, ev.clientY);
+      offset = { x: start.x - pos[id].x, y: start.y - pos[id].y };
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    });
+  });
+}
+function toggleNode(id){
+  const n = idx.byId.get(id);
+  if (!n || n.commissioned === false || n.type === "load") return; // can't fail passive / load
+  if (state.down.has(id)) state.down.delete(id); else state.down.add(id);
+  state.selected = null; // manual mode clears cut-set highlight
+  renderLive();
+}
+
+/* ============================ CUT-SET PANEL ============================== */
+function renderCutsets(){
+  const host = document.getElementById("cutsets");
+  const groups = [
+    { k:1, cls:"o1", title:"Order 1 — SINGLE POINT OF FAILURE (a redundant design should have none)" },
+    { k:2, cls:"o2", title:"Order 2 — double-fault redundancy proofs (demonstrate each)" },
+    { k:3, cls:"o3", title:"Order 3+ — remote combinations (enumerate, de-emphasise)" }
+  ];
+  let html = "";
+  groups.forEach(grp => {
+    const recs = cutResult.byOrder[grp.k] || [];
+    html += `<div class="grp">`;
+    html += `<div class="grp-h ${grp.cls}">${esc(grp.title)}<span class="count">${recs.length}</span></div>`;
+    if (!recs.length){
+      html += `<div class="empty">${grp.k===1 ? "None — no single points of failure found. ✓" : "None at this order."}</div>`;
+    } else {
+      recs.forEach(rec => {
+        const req = requirementFor(rec);
+        const chips = rec.arr.map(id => {
+          const f = (TYPE[idx.byId.get(id).type] || TYPE.passive).fill;
+          return `<span class="chip" style="background:${f}">${esc(shortLabel(id))}</span>`;
+        }).join("");
+        const selCls = state.selected === rec.id ? " sel" : "";
+        html += `<button class="cut ${grp.cls}${selCls}" data-cut="${esc(rec.id)}">
+          <div class="chips">${chips}</div>
+          <div class="req"><b>${esc(req.scenario)}.</b> ${esc(req.expected)}</div>
+        </button>`;
+      });
+    }
+    html += `</div>`;
+  });
+  host.innerHTML = html;
+  host.querySelectorAll("button.cut").forEach(b => {
+    b.addEventListener("click", () => selectCutset(b.getAttribute("data-cut")));
+  });
+}
+function selectCutset(cutId){
+  const rec = cutResult.all.find(r => r.id === cutId);
+  if (!rec) return;
+  state.selected = (state.selected === cutId) ? null : cutId;
+  // stage exactly this failure set (or clear if deselecting)
+  state.down = new Set(state.selected ? rec.arr : []);
+  renderLive();
+  document.querySelector(".diagram-wrap").scrollIntoView({ behavior:"smooth", block:"nearest" });
+}
+
+/* ============================ TEST MATRIX =============================== */
+const STATES = ["Not yet tested", "Assumed", "Demonstrated"];
+function stateClass(v){ return v === "Demonstrated" ? "s-dem" : v === "Assumed" ? "s-ass" : "s-not"; }
+function renderMatrix(){
+  const tbody = document.querySelector("#matrix tbody");
+  let html = "";
+  // order so the high-value rows are on top
+  const ordered = cutResult.all.slice().sort((a,b) => a.order - b.order);
+  if (!ordered.length){ tbody.innerHTML = `<tr><td colspan="5" class="empty">No cut sets up to the modelled order.</td></tr>`; return; }
+  ordered.forEach(rec => {
+    const req = requirementFor(rec);
+    const st = state.testState[rec.id] || (state.testState[rec.id] = "Not yet tested");
+    const pid = state.procoreId[rec.id] || "";
+    const assets = rec.arr.map(id => esc(shortLabel(id))).join(", ");
+    const opts = STATES.map(o => `<option ${o===st?"selected":""}>${o}</option>`).join("");
+    html += `<tr class="o${rec.order}">
+      <td><span class="ord">Order ${rec.order}</span><br>${esc(req.scenario)}</td>
+      <td>${esc(req.expected)}</td>
+      <td>${assets}</td>
+      <td><input class="pid" data-pid="${esc(rec.id)}" value="${esc(pid)}" placeholder="TST-…"></td>
+      <td><select class="state ${stateClass(st)}" data-st="${esc(rec.id)}">${opts}</select></td>
+    </tr>`;
+  });
+  tbody.innerHTML = html;
+  tbody.querySelectorAll("select.state").forEach(sel => {
+    sel.addEventListener("change", () => {
+      state.testState[sel.getAttribute("data-st")] = sel.value;
+      sel.className = "state " + stateClass(sel.value);
+      renderCoverage();
+    });
+  });
+  tbody.querySelectorAll("input.pid").forEach(inp => {
+    inp.addEventListener("input", () => { state.procoreId[inp.getAttribute("data-pid")] = inp.value; });
+  });
+}
+
+/* ============================ COVERAGE ================================== */
+function renderCoverage(){
+  const proofs = cutResult.all.filter(r => r.order <= 2);
+  const total = proofs.length;
+  const dem = proofs.filter(r => (state.testState[r.id] || "Not yet tested") === "Demonstrated").length;
+  const ass = proofs.filter(r => (state.testState[r.id] || "Not yet tested") === "Assumed").length;
+  const pct = total ? Math.round(dem / total * 100) : 100;
+  document.getElementById("covPct").textContent = pct + "%";
+  document.getElementById("covBar").style.width = pct + "%";
+  document.getElementById("covCounts").textContent = dem + " / " + total;
+  const o1 = (cutResult.byOrder[1] || []).length;
+  const o2 = (cutResult.byOrder[2] || []).length;
+  const o2dem = (cutResult.byOrder[2] || []).filter(r => (state.testState[r.id]||"Not yet tested")==="Demonstrated").length;
+  document.getElementById("covBreak").innerHTML =
+    `${o2dem}/${o2} order-2 redundancy proofs demonstrated · ${ass} assumed · ${o1} order-1 SPOF`;
+  const chip = document.getElementById("spofChip");
+  if (o1 === 0){ chip.className = "spofchip zero"; chip.textContent = "✓ 0 single points of failure"; }
+  else { chip.className = "spofchip"; chip.textContent = "✕ " + o1 + " single point" + (o1>1?"s":"") + " of failure"; }
+}
+
+/* ============================ LIVE BANNER =============================== */
+function renderLive(){
+  const supplied = isLoadSupplied(topo.load, state.down);
+  const b = document.getElementById("copBanner");
+  b.className = "banner " + (supplied ? "ok" : "lost");
+  b.innerHTML = supplied
+    ? `COP SUPPLIED<small>at least one catcher bus is fed through an up path</small>`
+    : `COP LOST<small>no up source reaches the critical load</small>`;
+  const scn = document.getElementById("scenario");
+  if (state.down.size === 0){ scn.innerHTML = "Scenario: <b>all assets healthy</b> (baseline)."; }
+  else {
+    const names = [...state.down].map(shortLabel).join(", ");
+    scn.innerHTML = `Scenario: failed → <b>${esc(names)}</b>${state.selected ? " (staged cut set)" : ""}.`;
+  }
+  renderDiagram();
+  renderCutsets();
+}
+
+/* ============================ FULL RECOMPUTE ============================ */
+function recomputeAll(){
+  idx = buildIndex(topo);
+  cutResult = findMinimalCutSets(topo.load, topo.maxOrder || 3);
+  // prune stale test states / ids for cut sets that no longer exist
+  const live = new Set(cutResult.all.map(r => r.id));
+  Object.keys(state.testState).forEach(k => { if (!live.has(k)) delete state.testState[k]; });
+  Object.keys(state.procoreId).forEach(k => { if (!live.has(k)) delete state.procoreId[k]; });
+  cutResult.all.forEach(r => { if (!(r.id in state.testState)) state.testState[r.id] = "Not yet tested"; });
+  state.down.forEach(id => { if (!idx.byId.has(id)) state.down.delete(id); });
+  document.getElementById("maxOrderNote").textContent = topo.maxOrder || 3;
+  renderLegend();
+  renderLive();
+  renderMatrix();
+  renderCoverage();
+}
+
+function renderLegend(){
+  const used = new Set(topo.nodes.map(n => n.type));
+  const host = document.getElementById("legend");
+  host.innerHTML = [...used].map(ty => {
+    const t = TYPE[ty] || TYPE.passive;
+    return `<span><i style="background:${t.fill}"></i>${esc(t.name)}</span>`;
+  }).join("") + `<span><i style="background:#ef4444"></i>Failed (✕)</span><span><i style="background:#fbbf24"></i>In selected cut set</span>`;
+}
+
+/* ============================ CSV OVERLAY =============================== */
+function normaliseStatus(raw){
+  const s = (raw || "").toLowerCase().trim();
+  if (/demonstrat|pass|complete|done|witness|verified|proven|proved/.test(s)) return "Demonstrated";
+  if (/assum|expect|paper|analys|review|planned/.test(s)) return "Assumed";
+  return "Not yet tested"; // includes not tested / untested / pending / blank / unknown
+}
+const STATE_RANK = { "Not yet tested":0, "Assumed":1, "Demonstrated":2 };
+function applyCsv(){
+  const msg = document.getElementById("csvMsg");
+  const lines = document.getElementById("csv").value.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const assetStatus = new Map();
+  let parsed = 0, unknownAssets = [];
+  for (const ln of lines){
+    if (/^asset_id\s*,/i.test(ln)) continue; // header
+    const parts = ln.split(",");
+    if (parts.length < 2) continue;
+    const id = parts[0].trim();
+    const status = normaliseStatus(parts.slice(1).join(","));
+    assetStatus.set(id, status);
+    parsed++;
+    if (!idx.byId.has(id)) unknownAssets.push(id);
+  }
+  if (!parsed){ msg.className = "msg err"; msg.textContent = "No usable rows. Use: asset_id, test_status"; return; }
+  // each cut set = worst (lowest-rank) status among its involved assets; missing → Not yet tested
+  cutResult.all.forEach(rec => {
+    let worst = "Demonstrated";
+    rec.arr.forEach(id => {
+      const st = assetStatus.has(id) ? assetStatus.get(id) : "Not yet tested";
+      if (STATE_RANK[st] < STATE_RANK[worst]) worst = st;
+    });
+    state.testState[rec.id] = worst;
+  });
+  renderMatrix(); renderCoverage();
+  msg.className = "msg ok";
+  msg.textContent = `Applied ${parsed} asset status row(s) → ${cutResult.all.length} cut-set proof(s) re-scored (weakest-asset rule).`
+    + (unknownAssets.length ? `  Note: ${unknownAssets.length} unknown asset id(s) ignored: ${unknownAssets.join(", ")}.` : "");
+}
+function sampleCsv(){
+  document.getElementById("csv").value =
+`asset_id, test_status
+AMCOP, demonstrated
+CUPP_MBP, assumed
+CUPS, demonstrated
+CUPP_XFMR, not yet tested
+BUS_1_1C, demonstrated
+BUS_2_1C, demonstrated`;
+}
+
+/* ============================ EXPORT =================================== */
+function downloadBlob(blob, name){
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+function exportPng(){
+  const svg = document.getElementById("diagram");
+  const vb = svg.viewBox.baseVal;
+  const clone = svg.cloneNode(true);
+  clone.setAttribute("width", vb.width);
+  clone.setAttribute("height", vb.height);
+  clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+  const xml = new XMLSerializer().serializeToString(clone);
+  const url = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
+  const img = new Image();
+  img.onload = () => {
+    const scale = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = vb.width * scale; canvas.height = vb.height * scale;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#0e1626"; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.scale(scale, scale); ctx.drawImage(img, 0, 0);
+    canvas.toBlob(blob => downloadBlob(blob, "cim-cutset-diagram.png"), "image/png");
+  };
+  img.onerror = () => alert("PNG export failed in this browser. Use Print / Save PDF instead.");
+  img.src = url;
+}
+
+/* ============================ TOPOLOGY EDITOR ========================== */
+function loadTopoEditor(){
+  document.getElementById("topoEdit").value = JSON.stringify(topo, null, 2);
+}
+function applyTopo(){
+  const msg = document.getElementById("topoMsg");
+  try{
+    const next = JSON.parse(document.getElementById("topoEdit").value);
+    if (!next.nodes || !next.edges || !next.load) throw new Error("Needs load, nodes[] and edges[].");
+    if (!next.nodes.find(n => n.id === next.load)) throw new Error("load id not found among nodes.");
+    topo = next; topo.maxOrder = topo.maxOrder || 3;
+    state.selected = null; state.down = new Set();
+    recomputeAll();
+    msg.className = "msg ok"; msg.textContent = "Topology applied and re-proved.";
+  }catch(e){
+    msg.className = "msg err"; msg.textContent = "Invalid: " + e.message;
+  }
+}
+function revertTopo(){
+  topo = JSON.parse(JSON.stringify(SEED));
+  state.selected = null; state.down = new Set();
+  state.testState = {}; state.procoreId = {};
+  loadTopoEditor();
+  recomputeAll();
+  document.getElementById("topoMsg").className = "msg ok";
+  document.getElementById("topoMsg").textContent = "Reverted to seed topology.";
+}
+
+/* ============================ WIRE UI =================================== */
+document.getElementById("btnReset").addEventListener("click", () => {
+  state.down = new Set(); state.selected = null; renderLive();
+});
+document.getElementById("btnRelayout").addEventListener("click", () => { renderDiagram(); });
+document.getElementById("btnPng").addEventListener("click", exportPng);
+document.getElementById("btnPrint").addEventListener("click", () => window.print());
+document.getElementById("btnApplyCsv").addEventListener("click", applyCsv);
+document.getElementById("btnSample").addEventListener("click", sampleCsv);
+document.getElementById("btnClearStates").addEventListener("click", () => {
+  cutResult.all.forEach(r => state.testState[r.id] = "Not yet tested");
+  renderMatrix(); renderCoverage();
+});
+document.getElementById("btnApplyTopo").addEventListener("click", applyTopo);
+document.getElementById("btnRevertTopo").addEventListener("click", revertTopo);
+
+/* ============================ SELF-TEST (console) ====================== */
+function selfTest(){
+  try{
+    const baseline = isLoadSupplied(topo.load, new Set());
+    const o1 = (cutResult.byOrder[1]||[]).map(r => r.arr.join("+")).sort();
+    const o2 = (cutResult.byOrder[2]||[]).map(r => r.arr.join("+")).sort();
+    console.log("[CIM self-test] COP supplied at baseline:", baseline);
+    console.log("[CIM self-test] order-1 cut sets:", o1);
+    console.log("[CIM self-test] order-2 cut sets:", o2);
+    console.assert(baseline === true, "baseline should be supplied");
+    // seed expectations
+    if (JSON.stringify(topo) === JSON.stringify(SEED)){
+      console.assert(JSON.stringify(o1) === JSON.stringify(["AMCOP","CUPP_MBP"]),
+        "seed order-1 should be AMCOP, CUPP_MBP");
+      console.assert(o2.includes("BUS_1_1C+BUS_2_1C") && o2.includes("CUPP_XFMR+CUPS"),
+        "seed order-2 should include the two redundancy pairs");
+    }
+  }catch(e){ console.warn("self-test error", e); }
+}
+
+/* ============================ BOOT ===================================== */
+recomputeAll();
+loadTopoEditor();
+selfTest();
+</script>
+</body>
+</html>
