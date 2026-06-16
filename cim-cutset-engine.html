@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CIM Cut-Set Engine — proof-driven commissioning</title>
+<style>
+/* ============================================================================
+   CHROME / TYPOGRAPHY  (house style — neutral, governs layout only)
+   The FUNCTIONAL colours below are NOT decorative and are never overridden:
+     --spof   red   = order-1 cut set = SINGLE POINT OF FAILURE
+     --ord2   amber = order-2 cut set = redundancy claim to commission
+     --ord3   grey  = order-3+ cut set = remote
+     --ok / --lost  green/red = COP status
+   ========================================================================== */
+:root{
+  --bg:#0f172a; --panel:#1e293b; --panel-2:#273449; --panel-3:#334155;
+  --text:#e2e8f0; --muted:#94a3b8; --border:#334155; --accent:#38bdf8;
+  /* FUNCTIONAL — do not repurpose */
+  --spof:#ef4444; --ord2:#f59e0b; --ord3:#94a3b8;
+  --ok:#22c55e; --lost:#ef4444;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--text); line-height:1.45; font-size:15px;
+  -webkit-text-size-adjust:100%;
+}
+header{padding:20px 18px 4px; max-width:1280px; margin:0 auto}
+h1{margin:0; font-size:1.5rem; letter-spacing:-.01em}
+.sub{margin:4px 0 0; color:var(--muted); font-size:.95rem}
+.tagline{display:inline-block; margin-top:8px; font-size:.72rem; font-weight:700;
+  letter-spacing:.05em; text-transform:uppercase; color:#0b1220; background:var(--accent);
+  padding:3px 9px; border-radius:999px}
+.selftest{display:inline-block; margin-left:8px; font-size:.72rem; font-weight:700;
+  letter-spacing:.04em; padding:3px 9px; border-radius:999px; border:1px solid var(--border)}
+.selftest.pass{color:#bbf7d0; background:#14532d; border-color:#166534}
+.selftest.fail{color:#fecaca; background:#7f1d1d; border-color:#b91c1c}
+
+main{max-width:1280px; margin:0 auto; padding:8px 18px 56px}
+
+/* ---- COP banner (functional green/red) ---- */
+.cop{
+  margin:14px 0; padding:18px 20px; border-radius:14px; text-align:center;
+  font-weight:800; letter-spacing:.02em; border:2px solid transparent;
+}
+.cop .big{font-size:clamp(1.5rem,5vw,2.4rem); line-height:1.05}
+.cop .small{font-size:.85rem; font-weight:600; margin-top:6px; opacity:.92}
+.cop.ok{background:rgba(34,197,94,.14); border-color:var(--ok); color:#bbf7d0}
+.cop.ok .big{color:var(--ok)}
+.cop.lost{background:rgba(239,68,68,.16); border-color:var(--lost); color:#fecaca}
+.cop.lost .big{color:var(--lost)}
+
+/* ---- stat cards ---- */
+.stats{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:14px 0}
+.stat{background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:14px 16px}
+.stat .v{font-size:2rem; font-weight:800; line-height:1; font-variant-numeric:tabular-nums}
+.stat .l{color:var(--muted); font-size:.8rem; margin-top:6px}
+.stat.spof{border-left:4px solid var(--spof)} .stat.spof .v.bad{color:var(--spof)} .stat.spof .v.good{color:var(--ok)}
+.stat.ord2{border-left:4px solid var(--ord2)} .stat.ord2 .v{color:var(--ord2)}
+.stat.ord3{border-left:4px solid var(--ord3)} .stat.ord3 .v{color:var(--ord3)}
+.stat.cov .v.r{color:var(--lost)} .stat.cov .v.a{color:var(--ord2)} .stat.cov .v.g{color:var(--ok)}
+
+/* ---- layout ---- */
+.grid{display:grid; grid-template-columns:1fr; gap:16px}
+@media(min-width:980px){ .grid.two{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)} }
+.panel{background:var(--panel); border:1px solid var(--border); border-radius:14px; padding:16px 18px}
+.panel h2{margin:0 0 4px; font-size:1.05rem}
+.panel h2 .hint{font-weight:400; color:var(--muted); font-size:.8rem}
+.panel .desc{color:var(--muted); font-size:.85rem; margin:0 0 12px}
+
+/* ---- diagram ---- */
+.diag-controls{display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin:6px 0 10px}
+.diag-controls label{font-size:.82rem; color:var(--muted)}
+select,button,input[type=text],textarea{
+  font-family:inherit; font-size:.85rem; color:var(--text);
+  background:var(--panel-2); border:1px solid var(--border); border-radius:8px; padding:7px 10px;
+}
+button{cursor:pointer; font-weight:600}
+button:hover{background:var(--panel-3)}
+button.primary{background:var(--accent); color:#0b1220; border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.06)}
+.diag-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--border);
+  border-radius:10px; background:#0b1324}
+svg.topo{display:block; width:100%; min-width:600px; height:auto}
+.scrollhint{display:none; color:var(--muted); font-size:.75rem; margin:6px 2px 0}
+@media(max-width:700px){ .scrollhint{display:block} }
+.node{cursor:pointer}
+.node text{pointer-events:none; user-select:none}
+.edge-live{stroke:#2dd4bf; stroke-width:2.6}
+.edge-idle{stroke:#475569; stroke-width:1.8}
+.edge-down{stroke:#ef4444; stroke-width:2.4; stroke-dasharray:6 4}
+
+.legend{display:flex; flex-wrap:wrap; gap:6px 14px; margin-top:12px; font-size:.74rem; color:var(--muted)}
+.legend .sw{display:inline-flex; align-items:center; gap:6px}
+.legend .dot{width:12px; height:12px; border-radius:3px; display:inline-block; border:1px solid #0008}
+.legend .ring{width:12px; height:12px; border-radius:3px; display:inline-block; background:transparent}
+.selcap{margin:12px 0 0; padding:10px 12px; border:1px dashed var(--border); border-radius:10px;
+  font-size:.85rem; min-height:1px}
+.selcap.empty{color:var(--muted)}
+.selcap .btnrow{margin-top:8px; display:flex; gap:8px; flex-wrap:wrap}
+
+/* ---- cut-set panel ---- */
+.cs-group{margin-bottom:14px}
+.cs-head{padding:8px 12px; border-radius:9px; font-weight:800; font-size:.85rem; letter-spacing:.02em}
+.cs-head.o1{background:rgba(239,68,68,.16); color:#fecaca; border:1px solid var(--spof)}
+.cs-head.o2{background:rgba(245,158,11,.15); color:#fde68a; border:1px solid var(--ord2)}
+.cs-head.o3{background:rgba(148,163,184,.14); color:#cbd5e1; border:1px solid var(--ord3)}
+.cs-head .lead{display:block; font-weight:800}
+.cs-head .note{display:block; font-weight:500; font-size:.75rem; opacity:.9; margin-top:2px}
+.cs-list{list-style:none; margin:8px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:8px}
+.cs-chip{cursor:pointer; border-radius:999px; padding:6px 12px; font-size:.82rem; font-weight:700;
+  border:1px solid var(--border); background:var(--panel-2); display:inline-flex; align-items:center; gap:6px}
+.cs-chip .ord{font-size:.66rem; font-weight:800; padding:1px 6px; border-radius:999px; color:#0b1220}
+.cs-chip.o1{border-color:var(--spof)} .cs-chip.o1 .ord{background:var(--spof); color:#fff}
+.cs-chip.o2{border-color:var(--ord2)} .cs-chip.o2 .ord{background:var(--ord2)}
+.cs-chip.o3{border-color:var(--ord3)} .cs-chip.o3 .ord{background:var(--ord3)}
+.cs-chip.sel{outline:3px solid var(--accent); outline-offset:1px}
+.cs-empty{color:var(--ok); font-size:.85rem; margin:8px 0 0; font-weight:600}
+.cs-empty.muted{color:var(--muted); font-weight:500}
+details.o3wrap{margin-top:6px}
+details.o3wrap summary{cursor:pointer; color:var(--muted); font-size:.85rem}
+
+/* ---- coverage ---- */
+.cov-bar{height:14px; border-radius:999px; background:var(--panel-3); overflow:hidden; margin:10px 0 8px}
+.cov-bar > i{display:block; height:100%; background:var(--ok); transition:width .2s}
+.cov-line{font-size:.85rem; color:var(--muted)}
+.cov-line b{color:var(--text)}
+.cov-breakdown{display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:8px; font-size:.8rem}
+.cov-breakdown span b{font-variant-numeric:tabular-nums}
+
+/* ---- tables ---- */
+.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch}
+table.mx{width:100%; border-collapse:collapse; min-width:720px; font-size:.85rem}
+table.mx th,table.mx td{padding:9px 10px; text-align:left; border-bottom:1px solid var(--border); vertical-align:top}
+table.mx thead th{color:var(--muted); font-weight:600; font-size:.78rem; position:sticky; top:0; background:var(--panel)}
+table.mx tbody tr{cursor:pointer}
+table.mx tbody tr:hover{background:var(--panel-2)}
+table.mx tbody tr.sel{background:var(--panel-2); box-shadow:inset 3px 0 0 var(--accent)}
+table.mx td.scn{min-width:240px}
+table.mx td.out{min-width:240px; color:var(--muted)}
+.ordtag{font-size:.66rem; font-weight:800; padding:2px 7px; border-radius:999px; color:#0b1220; white-space:nowrap}
+.ordtag.o1{background:var(--spof); color:#fff} .ordtag.o2{background:var(--ord2)} .ordtag.o3{background:var(--ord3)}
+.asset{display:inline-block; background:var(--panel-3); border-radius:6px; padding:1px 7px; margin:1px 3px 1px 0; font-size:.78rem}
+table.mx input[type=text]{width:118px; padding:5px 8px}
+table.mx select{padding:5px 8px}
+select.st-demonstrated{border-color:var(--ok); color:#bbf7d0}
+select.st-assumed{border-color:var(--ord2); color:#fde68a}
+select.st-untested{border-color:var(--border); color:var(--muted)}
+
+/* ---- procore / assumptions / editor ---- */
+textarea{width:100%; min-height:84px; resize:vertical; line-height:1.4; font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.8rem}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+.note-list{margin:8px 0 0; padding-left:18px; font-size:.85rem; color:var(--muted)}
+.note-list li{margin:4px 0}
+.confirm{display:inline-block; font-size:.7rem; font-weight:800; letter-spacing:.04em; color:#0b1220;
+  background:var(--ord2); padding:2px 8px; border-radius:999px; margin-left:6px}
+.err{color:#fecaca; background:rgba(239,68,68,.14); border:1px solid var(--spof); border-radius:8px;
+  padding:8px 10px; font-size:.82rem; margin-top:8px; white-space:pre-wrap; display:none}
+.editor-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+footer{max-width:1280px; margin:0 auto; padding:0 18px 40px; color:var(--muted); font-size:.78rem}
+.kbd{font-family:ui-monospace,monospace; background:var(--panel-3); border-radius:5px; padding:1px 6px}
+</style>
+</head>
+<body>
+<header>
+  <h1>CIM Cut-Set Engine</h1>
+  <p class="sub">Prove the redundancy claim from the as-built topology — then let the proof tell you exactly what to commission.</p>
+  <span class="tagline">LHR095 · B-side · catcher-spine → COP</span>
+  <span id="selftest" class="selftest">engine self-test…</span>
+</header>
+
+<main>
+  <!-- COP status banner (functional) -->
+  <div id="cop" class="cop ok"><div class="big">COP SUPPLIED</div><div class="small"></div></div>
+
+  <!-- stat cards -->
+  <div id="stats" class="stats"></div>
+
+  <div class="grid two">
+    <!-- TOPOLOGY -->
+    <section class="panel">
+      <h2>Topology <span class="hint">— tap a node to fail / restore it</span></h2>
+      <p class="desc">Directed power flow, source → load. Failing a node recomputes COP supply live.
+        Use this to <b>watch illusory redundancy collapse</b>: fail one shared upstream node and every "independent" path below it goes dark.</p>
+      <div class="diag-controls">
+        <label>Search depth (max order)
+          <select id="maxOrder">
+            <option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option>
+          </select>
+        </label>
+        <button id="clearFail">Clear failures</button>
+      </div>
+      <div class="diag-wrap"><svg id="svg" class="topo" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <p class="scrollhint">↔ scroll the diagram sideways on small screens</p>
+      <div class="legend" id="legend"></div>
+      <div id="selcap" class="selcap empty">No cut set selected — tap one in the panel or the test matrix to highlight it here.</div>
+    </section>
+
+    <!-- CUT SETS -->
+    <section class="panel">
+      <h2>Minimal cut sets <span class="hint">— the proof</span></h2>
+      <p class="desc">Every smallest combination of failures that cuts COP, enumerated exhaustively (brute-force, no sampling). Tap one to highlight it.</p>
+      <div id="cutsets"></div>
+    </section>
+  </div>
+
+  <!-- COVERAGE -->
+  <section class="panel" style="margin-top:16px">
+    <h2>Redundancy-proof coverage <span class="hint">— order ≤ 2</span></h2>
+    <div class="cov-bar"><i id="covFill" style="width:0%"></i></div>
+    <div class="cov-line" id="covLine"></div>
+    <div class="cov-breakdown" id="covBreak"></div>
+  </section>
+
+  <!-- TEST MATRIX -->
+  <section class="panel" style="margin-top:16px">
+    <h2>Commissioning test matrix</h2>
+    <p class="desc">Each cut set becomes one test requirement. Fill the Procore Test ID and mark its state. Tap a row to highlight its components on the diagram.</p>
+    <div class="table-wrap">
+      <table class="mx">
+        <thead><tr>
+          <th>Scenario</th><th>Expected outcome</th><th>Assets involved</th><th>Procore Test ID</th><th>State</th>
+        </tr></thead>
+        <tbody id="mxBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- PROCORE OVERLAY -->
+  <section class="panel" style="margin-top:16px">
+    <h2>Procore overlay <span class="hint">— the demo bridge</span></h2>
+    <p class="desc">Paste a CSV to bulk-set test states, or just use the dropdowns above. Format: one row per line,
+      <span class="mono">id,status</span> — <b>id</b> matches a Procore Test ID or any asset id in the cut set;
+      <b>status</b> = <span class="mono">demonstrated</span> / <span class="mono">assumed</span> / <span class="mono">not tested</span>.</p>
+    <textarea id="csv" placeholder="BUS_1_1C, demonstrated
+PROC-4471, demonstrated
+CUPS, assumed
+AMCOP, not tested"></textarea>
+    <div class="editor-actions">
+      <button class="primary" id="applyCsv">Apply CSV</button>
+      <button id="csvDemoAll">Mark all order-2 demonstrated</button>
+      <button id="csvReset">Reset all to “not tested”</button>
+    </div>
+    <div id="csvErr" class="err"></div>
+  </section>
+
+  <!-- ASSUMPTIONS -->
+  <section class="panel" style="margin-top:16px">
+    <h2>Modelling assumptions — confirm these <span class="confirm">CONFIRM AGAINST SINGLE-LINE</span></h2>
+    <p class="desc">Node facts are verified. Edges are <b>illustrative</b> and deliberately route both catcher buses through one
+      shared upstream chain (AMCOP → CUPP-MBP) so the engine demonstrates a real single point of failure on first run.
+      If the as-built feeds the two buses from independent paths, edit the wiring below and watch the order-1 cut sets disappear.</p>
+    <ul class="note-list" id="assume"></ul>
+  </section>
+
+  <!-- TOPOLOGY EDITOR -->
+  <section class="panel" style="margin-top:16px">
+    <h2>Edit topology <span class="hint">— correct the wiring against the single-line</span></h2>
+    <p class="desc">The single editable model object (nodes + edges). Edit and Apply to recompute everything live —
+      no logic changes needed. This is the “watch the SPOF vanish” control.</p>
+    <textarea id="topoEditor" style="min-height:260px"></textarea>
+    <div class="editor-actions">
+      <button class="primary" id="applyTopo">Apply topology</button>
+      <button id="resetTopo">Reset to seed</button>
+    </div>
+    <div id="topoErr" class="err"></div>
+  </section>
+</main>
+
+<footer>
+  Demonstration-grade methodology tool · fully client-side · no backend, no external libraries.
+  Personal commissioning-intelligence IP — a standalone proof tool, not to be embedded in any client or third-party system.
+</footer>
+
+<script>
+/* ===========================================================================
+   1) THE EDITABLE TOPOLOGY  — single source of truth.
+   NODE FACTS verified.  EDGES ILLUSTRATIVE — CONFIRM AGAINST SINGLE-LINE.
+   Edit this object (or the in-app editor) to correct the wiring in seconds.
+   =========================================================================== */
+const SEED_TOPOLOGY = {
+  nodes: [
+    // id          type           label                                                          commissioned
+    { id:'MEDS_1',    type:'source',      label:'MEDS mains feed',                                                  commissioned:true },
+    { id:'MEDS_2',    type:'source',      label:'MEDS mains feed',                                                  commissioned:true },
+    { id:'GEN_1',     type:'source',      label:'Generator',                                                        commissioned:true },
+    { id:'GEN_2',     type:'source',      label:'Generator',                                                        commissioned:true },
+    { id:'AMCOP',     type:'ats',         label:'AMCOP — 3-source ATS, electro-mechanical interlock, between MEDS and GEN', commissioned:true },
+    { id:'DLB',       type:'protection',  label:'DLB load-shed (DAC/LAC controllers), generator protection',        commissioned:true },
+    { id:'CUPP_MBP',  type:'breaker',     label:'CUPP-MBP main breaker panel',                                      commissioned:true },
+    { id:'CUPS',      type:'ups',         label:'CUPS',                                                             commissioned:true },
+    { id:'CUPP_XFMR', type:'transformer', label:'CUPP-XFMR',                                                        commissioned:true },
+    { id:'BUS_1_1C',  type:'bus',         label:'BUS 1.1C — catcher spine, feeds COP only',                         commissioned:true },
+    { id:'BUS_2_1C',  type:'bus',         label:'BUS 2.1C — catcher spine, feeds COP + every MEDS lifeboat tap',    commissioned:true },
+    { id:'GENAN',     type:'passive',     label:'GENAN switchgear furniture — NOT a commissioned asset',            commissioned:false },
+    { id:'COP',       type:'load',        label:'COP — critical load',                                              commissioned:true }
+  ],
+  // EDGES (illustrative — CONFIRM AGAINST SINGLE-LINE) — power flows from → to.
+  edges: [
+    ['MEDS_1','AMCOP'], ['MEDS_2','AMCOP'], ['GEN_1','AMCOP'], ['GEN_2','AMCOP'],   // CONFIRM: all 4 sources into the one ATS
+    ['AMCOP','CUPP_MBP'],                                                            // CONFIRM: shared upstream — everything funnels through here
+    ['CUPP_MBP','CUPS'], ['CUPP_MBP','CUPP_XFMR'],                                   // CUPP-MBP feeds CUPS and CUPP-XFMR in PARALLEL (verified)
+    ['CUPS','BUS_1_1C'], ['CUPS','BUS_2_1C'],                                        // CONFIRM
+    ['CUPP_XFMR','BUS_1_1C'], ['CUPP_XFMR','BUS_2_1C'],                              // CONFIRM
+    ['BUS_1_1C','COP'], ['BUS_2_1C','COP']                                           // verified: COP fed ONLY by the two catcher buses
+  ]
+  // NOTE: DLB and GENAN are intentionally unwired in this illustrative model
+  // (DLB protection is simplified out of the series path; GENAN is passive furniture).
+};
+
+/* short display names for the diagram + chips */
+const SHORT = {
+  MEDS_1:'MEDS 1', MEDS_2:'MEDS 2', GEN_1:'GEN 1', GEN_2:'GEN 2', AMCOP:'AMCOP', DLB:'DLB',
+  CUPP_MBP:'CUPP-MBP', CUPS:'CUPS', CUPP_XFMR:'CUPP-XFMR', BUS_1_1C:'BUS 1.1C', BUS_2_1C:'BUS 2.1C',
+  GENAN:'GENAN', COP:'COP'
+};
+const shortName = id => SHORT[id] || id.replace(/_/g,' ');
+
+/* node-type fill colours — CHROME ONLY (not functional). Functional signalling is the
+   COP node colour, the cut-set ring colours, and the COP banner. */
+const TYPE_FILL = {
+  source:'#0e7490', ats:'#6d28d9', protection:'#475569', breaker:'#a21caf',
+  ups:'#1d4ed8', transformer:'#3730a3', bus:'#0f766e', passive:'transparent', load:'#475569'
+};
+const TYPE_ORDER = ['source','ats','protection','breaker','ups','transformer','bus','load','passive'];
+
+/* ===========================================================================
+   2) THE ENGINE  — pure, exhaustive, correct (priority #1).
+   Works on any (nodes, adj, loadId); no globals, so it is self-testable.
+   =========================================================================== */
+function indexBy(nodes){ const m={}; for(const n of nodes) m[n.id]=n; return m; }
+function buildAdj(edges){ const a={}; for(const [u,v] of edges){ (a[u]=a[u]||[]).push(v); } return a; }
+
+/* A node counts as "up" unless it is in downSet.  Passive (commissioned=false) is
+   structure — always up.  (Sources only deliver power if up; handled by the BFS roots.) */
+function isUp(node, downSet){ if(!node) return false; if(!node.commissioned) return true; return !downSet.has(node.id); }
+
+/* isLoadSupplied: true iff a directed path exists from any UP source to the load
+   through UP nodes only.  An ATS therefore passes power exactly when it is up AND
+   reachable from an up source — which forward reachability gives for free. */
+function isLoadSupplied(nodes, adj, loadId, downSet){
+  return energisedSet(nodes, adj, downSet).has(loadId);
+}
+/* forward reachability from all up sources, through up nodes only */
+function energisedSet(nodes, adj, downSet){
+  const byId = indexBy(nodes);
+  const seen = new Set(); const q = [];
+  for(const n of nodes){ if(n.type==='source' && isUp(n,downSet)){ seen.add(n.id); q.push(n.id); } }
+  while(q.length){
+    const cur = q.shift();
+    for(const nx of (adj[cur]||[])){
+      if(seen.has(nx)) continue;
+      const nn = byId[nx];
+      if(nn && isUp(nn,downSet)){ seen.add(nx); q.push(nx); }
+    }
+  }
+  return seen;
+}
+
+/* all k-combinations of an array (indices in increasing order → each combo once) */
+function combinations(arr, k){
+  const out=[], combo=[];
+  (function rec(start){
+    if(combo.length===k){ out.push(combo.slice()); return; }
+    for(let i=start;i<arr.length;i++){ combo.push(arr[i]); rec(i+1); combo.pop(); }
+  })(0);
+  return out;
+}
+
+/* findMinimalCutSets — exhaustive brute-force search up to maxOrder.
+   Candidates = commissioned nodes that are NOT the load and NOT passive.
+   (The load itself is what we protect; its own failure is not a "cut set" — and the
+   spec's expected order-1 result, {AMCOP},{CUPP-MBP}, confirms the load is excluded.)
+   Minimality is enforced by skipping any combo that contains an already-recorded
+   (smaller, minimal) cut set as a subset. */
+function findMinimalCutSets(nodes, adj, loadId, maxOrder){
+  const candidates = nodes
+    .filter(n => n.commissioned && n.type!=='load' && n.type!=='passive')
+    .map(n => n.id);
+  const found = [];        // [{order, members:[...], key}]
+  const foundSets = [];    // [Set] for subset checks
+  for(let k=1;k<=maxOrder;k++){
+    for(const combo of combinations(candidates,k)){
+      const cset = new Set(combo);
+      // minimality: skip if any recorded cut set ⊆ combo
+      let dominated=false;
+      for(const fs of foundSets){
+        let sub=true;
+        for(const id of fs){ if(!cset.has(id)){ sub=false; break; } }
+        if(sub){ dominated=true; break; }
+      }
+      if(dominated) continue;
+      if(!isLoadSupplied(nodes, adj, loadId, cset)){
+        found.push({ order:k, members:combo.slice(), key:combo.slice().sort().join('+') });
+        foundSets.push(cset);
+      }
+    }
+  }
+  return found;
+}
+const findLoad = nodes => (nodes.find(n=>n.type==='load')||{}).id;
+
+/* ===========================================================================
+   3) BUILT-IN SELF-TEST — proves the engine on the seed topology every load.
+   =========================================================================== */
+function runSelfTest(){
+  const n = SEED_TOPOLOGY.nodes, a = buildAdj(SEED_TOPOLOGY.edges), L = findLoad(n);
+  const eq = (got, want) => { const g=[...got].sort().join('|'), w=[...want].sort().join('|'); return g===w; };
+  try{
+    const r3 = findMinimalCutSets(n,a,L,3);
+    const o1 = r3.filter(c=>c.order===1).map(c=>c.key);
+    const o2 = r3.filter(c=>c.order===2).map(c=>c.key);
+    const o3 = r3.filter(c=>c.order===3).map(c=>c.key);
+    const checks = [
+      ['order-1 = {AMCOP},{CUPP_MBP}', eq(o1, ['AMCOP','CUPP_MBP'])],
+      ['order-2 = {CUPS,CUPP_XFMR},{BUS_1_1C,BUS_2_1C}', eq(o2, ['CUPP_XFMR+CUPS','BUS_1_1C+BUS_2_1C'])],
+      ['order-3 = none', o3.length===0],
+      ['baseline supplied', isLoadSupplied(n,a,L,new Set())===true],
+      ['AMCOP down → COP lost', isLoadSupplied(n,a,L,new Set(['AMCOP']))===false],
+      ['one source down → still supplied', isLoadSupplied(n,a,L,new Set(['MEDS_1']))===true],
+      ['both buses down → COP lost', isLoadSupplied(n,a,L,new Set(['BUS_1_1C','BUS_2_1C']))===false],
+      ['order-4 reveals all-sources cut', findMinimalCutSets(n,a,L,4).some(c=>c.key==='GEN_1+GEN_2+MEDS_1+MEDS_2')]
+    ];
+    const failed = checks.filter(c=>!c[1]);
+    if(failed.length===0){ console.log('%cEngine self-test: PASS','color:#22c55e;font-weight:bold'); checks.forEach(c=>console.log('  ✓',c[0])); return {ok:true}; }
+    console.error('Engine self-test: FAIL', failed.map(c=>c[0]));
+    return {ok:false, failed};
+  }catch(e){ console.error('Engine self-test threw', e); return {ok:false, failed:[['exception',false]]}; }
+}
+
+/* ===========================================================================
+   4) APP STATE + RENDER
+   =========================================================================== */
+const clone = o => JSON.parse(JSON.stringify(o));
+let topo = clone(SEED_TOPOLOGY);
+let nodes = topo.nodes, adj = buildAdj(topo.edges), loadId = findLoad(nodes);
+let maxOrder = 3;
+let manualDown = new Set();   // user-failed nodes (what-if)
+let cutSets = [];             // current enumeration
+let selectedKey = null;       // highlighted cut set
+let positions = {};           // id -> {cx,cy}
+let viewW = 760, viewH = 740;
+const testState = {};         // key -> 'untested'|'assumed'|'demonstrated'
+const testIds   = {};         // key -> procore id string
+
+/* ---- auto-layout: longest-path layering from sources (robust to edits) ---- */
+const NW=134, NH=50, MARGIN=80, TOP=60, ROWGAP=112;
+function computeLayout(){
+  positions = {};
+  const ids = nodes.map(n=>n.id);
+  const incoming = {}, hasEdge = {};
+  ids.forEach(id=>incoming[id]=[]);
+  for(const [u,v] of topo.edges){ if(incoming[v]) incoming[v].push(u); hasEdge[u]=true; hasEdge[v]=true; }
+  const wired = ids.filter(id=>hasEdge[id]);
+  const floating = ids.filter(id=>!hasEdge[id]);
+  const rank = {};
+  const rankOf = (id, stack) => {
+    if(rank[id]!=null) return rank[id];
+    const preds = incoming[id]||[];
+    if(!preds.length){ return rank[id]=0; }
+    let mx=0;
+    for(const p of preds){ if(stack.has(p)) continue; stack.add(p); mx=Math.max(mx, rankOf(p,stack)+1); stack.delete(p); }
+    return rank[id]=mx;
+  };
+  wired.forEach(id=>rankOf(id,new Set()));
+  let maxR=0; wired.forEach(id=>maxR=Math.max(maxR,rank[id]));
+  // group by rank, keep original node order within a rank
+  const layers=[]; for(let r=0;r<=maxR;r++) layers[r]=[];
+  for(const n of nodes){ if(hasEdge[n.id]) layers[rank[n.id]].push(n.id); }
+  const place = (arr, y) => {
+    const m=arr.length; const span=viewW-2*MARGIN;
+    arr.forEach((id,i)=>{ positions[id]={cx:MARGIN+span*(i+0.5)/m, cy:y}; });
+  };
+  layers.forEach((arr,r)=> place(arr, TOP + r*ROWGAP));
+  let h = TOP + maxR*ROWGAP + NH/2 + 30;
+  if(floating.length){
+    const fy = TOP + (maxR+1)*ROWGAP + 14;
+    place(floating, fy);
+    floating.forEach(id=>positions[id].floating=true);
+    h = fy + NH/2 + 34;
+  }
+  viewH = h;
+}
+
+/* ---- render: COP banner ---- */
+function renderBanner(){
+  const energ = energisedSet(nodes, adj, manualDown);
+  const supplied = energ.has(loadId);
+  const el = document.getElementById('cop');
+  el.className = 'cop ' + (supplied?'ok':'lost');
+  const buses = nodes.filter(n=>n.type==='bus' && energ.has(n.id)).map(n=>shortName(n.id));
+  el.querySelector('.big').textContent = supplied ? 'COP SUPPLIED' : 'COP LOST';
+  el.querySelector('.small').textContent = supplied
+    ? (buses.length ? 'Live via ' + buses.join(' + ') : 'Live path present')
+    : (manualDown.size ? 'No surviving path with ' + [...manualDown].map(shortName).join(', ') + ' failed' : 'No surviving path');
+}
+
+/* ---- render: stat cards ---- */
+function renderStats(){
+  const o1=cutSets.filter(c=>c.order===1).length;
+  const o2=cutSets.filter(c=>c.order===2).length;
+  const o3=cutSets.filter(c=>c.order>=3).length;
+  const cov=coverage();
+  const covCls = cov.pct>=100?'g':cov.pct>=50?'a':'r';
+  document.getElementById('stats').innerHTML = `
+    <div class="stat spof"><div class="v ${o1?'bad':'good'}">${o1}</div><div class="l">Single points of failure (order-1)${o1?'':' — none ✓'}</div></div>
+    <div class="stat ord2"><div class="v">${o2}</div><div class="l">Order-2 redundancy claims to commission</div></div>
+    <div class="stat ord3"><div class="v">${o3}</div><div class="l">Order-3+ cut sets (remote)</div></div>
+    <div class="stat cov"><div class="v ${covCls}">${cov.total?cov.pct+'%':'—'}</div><div class="l">Order-≤2 proofs demonstrated (${cov.demo}/${cov.total})</div></div>`;
+}
+
+/* ---- render: SVG ---- */
+function svgEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function renderSVG(){
+  const svg = document.getElementById('svg');
+  svg.setAttribute('viewBox', `0 0 ${viewW} ${viewH}`);
+  const energ = energisedSet(nodes, adj, manualDown);
+  const supplied = energ.has(loadId);
+  const selSet = selectedKey ? new Set(selectedKey.split('+')) : null;
+  const selOrder = selectedKey ? (cutSets.find(c=>c.key===selectedKey)||{}).order : null;
+  const ringCol = selOrder===1?'var(--spof)':selOrder===2?'var(--ord2)':'var(--ord3)';
+
+  let s = `<defs>
+    <marker id="ar-live" markerWidth="11" markerHeight="11" refX="8.5" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#2dd4bf"/></marker>
+    <marker id="ar-idle" markerWidth="11" markerHeight="11" refX="8.5" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#475569"/></marker>
+    <marker id="ar-down" markerWidth="11" markerHeight="11" refX="8.5" refY="3" orient="auto" markerUnits="userSpaceOnUse"><path d="M0,0 L9,3 L0,6 Z" fill="#ef4444"/></marker>
+  </defs>`;
+
+  // edges
+  for(const [u,v] of topo.edges){
+    const pu=positions[u], pv=positions[v]; if(!pu||!pv) continue;
+    const down = manualDown.has(u)||manualDown.has(v);
+    const live = !down && energ.has(u) && energ.has(v);
+    const cls = down?'edge-down':(live?'edge-live':'edge-idle');
+    const mk  = down?'url(#ar-down)':(live?'url(#ar-live)':'url(#ar-idle)');
+    s += `<line class="${cls}" x1="${pu.cx.toFixed(1)}" y1="${(pu.cy+NH/2).toFixed(1)}" x2="${pv.cx.toFixed(1)}" y2="${(pv.cy-NH/2).toFixed(1)}" marker-end="${mk}"/>`;
+  }
+
+  // floating-lane caption
+  const floaters = nodes.filter(n=>positions[n.id] && positions[n.id].floating);
+  if(floaters.length){
+    const fy = positions[floaters[0].id].cy;
+    s += `<line x1="20" y1="${(fy-NH/2-18).toFixed(1)}" x2="${viewW-20}" y2="${(fy-NH/2-18).toFixed(1)}" stroke="#334155" stroke-dasharray="3 5"/>`;
+    s += `<text x="22" y="${(fy-NH/2-24).toFixed(1)}" fill="#64748b" font-size="11" font-style="italic">Modelled, not wired (structural / simplified) — confirm</text>`;
+  }
+
+  // nodes
+  for(const n of nodes){
+    const p=positions[n.id]; if(!p) continue;
+    const down=manualDown.has(n.id);
+    const en=energ.has(n.id);
+    const isLoad=n.type==='load', isPassive=!n.commissioned, isSource=n.type==='source';
+    let fill = TYPE_FILL[n.type]||'#334155';
+    let stroke = '#0b1324', sw=1.5;
+    if(isLoad){ fill = supplied?'#16a34a':'#dc2626'; stroke = supplied?'#22c55e':'#ef4444'; sw=2.5; }
+    if(isPassive){ fill='transparent'; stroke='#475569'; sw=1.5; }
+    if(down){ fill='#3f1212'; stroke='#ef4444'; sw=3; }
+    // opacity: dim "up but not energised" commissioned process nodes
+    let op=1;
+    if(!isPassive && !isLoad && !isSource && !en && !down) op=0.4;
+    if(selSet) op *= selSet.has(n.id)?1:0.32;
+    const x=(p.cx-NW/2), y=(p.cy-NH/2);
+    s += `<g class="node" data-id="${n.id}" opacity="${op}"><title>${svgEsc(n.label)} — ${down?'FAILED (tap to restore)':'tap to fail'}</title>`;
+    if(selSet && selSet.has(n.id)){
+      s += `<rect x="${(x-5).toFixed(1)}" y="${(y-5).toFixed(1)}" width="${NW+10}" height="${NH+10}" rx="12" fill="none" stroke="${ringCol}" stroke-width="4"/>`;
+    }
+    s += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${NW}" height="${NH}" rx="9" fill="${fill}" stroke="${stroke}" stroke-width="${sw}" ${isPassive?'stroke-dasharray="5 4"':''}/>`;
+    const tcol = isPassive ? '#94a3b8' : '#f8fafc';
+    s += `<text x="${p.cx.toFixed(1)}" y="${(p.cy-2).toFixed(1)}" text-anchor="middle" fill="${tcol}" font-size="15" font-weight="700">${svgEsc(shortName(n.id))}</text>`;
+    let sub = n.type.toUpperCase();
+    if(isPassive) sub='PASSIVE · not a candidate';
+    if(isLoad) sub = supplied?'LOAD · supplied':'LOAD · LOST';
+    s += `<text x="${p.cx.toFixed(1)}" y="${(p.cy+13).toFixed(1)}" text-anchor="middle" fill="${tcol}" font-size="9.5" opacity="0.85">${svgEsc(sub)}</text>`;
+    if(down){
+      s += `<text x="${(x+NW-6).toFixed(1)}" y="${(y+14).toFixed(1)}" text-anchor="end" fill="#fca5a5" font-size="10" font-weight="800">✕ FAILED</text>`;
+    }
+    s += `</g>`;
+  }
+  svg.innerHTML = s;
+}
+
+/* ---- render: legend ---- */
+function renderLegend(){
+  const types = TYPE_ORDER.filter(t=>nodes.some(n=>n.type===t));
+  let h = '';
+  types.forEach(t=>{
+    const c = t==='load' ? 'linear-gradient(135deg,#16a34a,#dc2626)' : (TYPE_FILL[t]==='transparent'?'transparent':TYPE_FILL[t]);
+    const border = TYPE_FILL[t]==='transparent'?'1px dashed #64748b':'1px solid #0008';
+    h += `<span class="sw"><span class="dot" style="background:${c};border:${border}"></span>${t}</span>`;
+  });
+  h += `<span class="sw"><span class="dot" style="background:#3f1212;border:1px solid #ef4444"></span>failed (tapped)</span>`;
+  h += `<span class="sw"><span class="dot" style="background:#1e293b;border:1px solid #334155;opacity:.5"></span>idle (un-energised)</span>`;
+  h += `<span class="sw"><span class="ring" style="border:3px solid var(--spof)"></span>SPOF (o1)</span>`;
+  h += `<span class="sw"><span class="ring" style="border:3px solid var(--ord2)"></span>order-2</span>`;
+  h += `<span class="sw"><span class="ring" style="border:3px solid var(--ord3)"></span>order-3+</span>`;
+  document.getElementById('legend').innerHTML = h;
+}
+
+/* ---- render: cut-set panel ---- */
+function renderCutSets(){
+  const el = document.getElementById('cutsets');
+  const byOrder = {};
+  cutSets.forEach(c=> (byOrder[c.order]=byOrder[c.order]||[]).push(c));
+  const chip = c => `<li class="cs-chip o${Math.min(c.order,3)} ${selectedKey===c.key?'sel':''}" data-key="${c.key}">
+      <span class="ord">o${c.order}</span>${c.members.map(shortName).join(' + ')}</li>`;
+  let h = '';
+
+  // order 1
+  h += `<div class="cs-group"><div class="cs-head o1">
+      <span class="lead">⛔ SINGLE POINTS OF FAILURE — a redundant design should have NONE</span>
+      <span class="note">Each one alone cuts COP. If any appear in a 2N/N+1 design, it is a design gap or a wiring-model error.</span></div>`;
+  if(byOrder[1]&&byOrder[1].length){ h += `<ul class="cs-list">${byOrder[1].map(chip).join('')}</ul>`; }
+  else { h += `<p class="cs-empty">✓ None — no single points of failure.</p>`; }
+  h += `</div>`;
+
+  // order 2
+  h += `<div class="cs-group"><div class="cs-head o2">
+      <span class="lead">Order-2 — double-fault redundancy claims</span>
+      <span class="note">The high-value commissioning targets: each is a redundancy claim that must be demonstrated.</span></div>`;
+  if(byOrder[2]&&byOrder[2].length){ h += `<ul class="cs-list">${byOrder[2].map(chip).join('')}</ul>`; }
+  else { h += `<p class="cs-empty muted">None within the current model.</p>`; }
+  h += `</div>`;
+
+  // order 3+
+  const hi = []; for(let k=3;k<=maxOrder;k++) if(byOrder[k]) hi.push(...byOrder[k]);
+  h += `<div class="cs-group"><div class="cs-head o3"><span class="lead">Order-3+ — remote</span>
+      <span class="note">Enumerated for completeness, de-emphasised.</span></div>`;
+  if(hi.length){
+    h += `<details class="o3wrap" open><summary>${hi.length} cut set(s) of order 3–${maxOrder}</summary><ul class="cs-list">${hi.map(chip).join('')}</ul></details>`;
+  } else {
+    h += `<p class="cs-empty muted">None within order ≤ ${maxOrder}.</p>`;
+  }
+  h += `</div>`;
+  el.innerHTML = h;
+}
+
+/* ---- scenario generation ---- */
+function scenarioFor(c){
+  const nm = c.members.map(shortName);
+  if(c.order===1) return {
+    scn:`Fail ${nm[0]} → SINGLE POINT OF FAILURE: no surviving path to COP.`,
+    out:`COP IS LOST. No redundancy exists — design review / mitigation required. Should not appear in a 2N/N+1 design.`
+  };
+  if(c.order===2) return {
+    scn:`Fail ${nm[0]} → COP must remain fed via ${nm[1]} (and vice-versa).`,
+    out:`COP stays SUPPLIED on the surviving path; only losing BOTH ${nm[0]} and ${nm[1]} cuts COP. Demonstrates the redundancy claim.`
+  };
+  return {
+    scn:`Fail any ${c.order-1} of {${nm.join(', ')}} → COP must remain fed via the remaining member.`,
+    out:`COP stays supplied unless all ${c.order} fail together (remote, order ${c.order}).`
+  };
+}
+
+/* ---- render: test matrix ---- */
+function renderMatrix(){
+  const body = document.getElementById('mxBody');
+  if(!cutSets.length){ body.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">No cut sets at this depth.</td></tr>`; return; }
+  body.innerHTML = cutSets.map(c=>{
+    const sc = scenarioFor(c);
+    const st = testState[c.key]||'untested';
+    const tid = testIds[c.key]||'';
+    const oc = Math.min(c.order,3);
+    return `<tr data-key="${c.key}" class="${selectedKey===c.key?'sel':''}">
+      <td class="scn"><span class="ordtag o${oc}">order ${c.order}</span><div style="margin-top:6px">${svgEsc(sc.scn)}</div></td>
+      <td class="out">${svgEsc(sc.out)}</td>
+      <td>${c.members.map(m=>`<span class="asset">${shortName(m)}</span>`).join('')}</td>
+      <td><input type="text" data-field="testid" placeholder="PROC-…" value="${svgEsc(tid)}"></td>
+      <td><select data-field="state" class="st-${st}">
+        <option value="untested" ${st==='untested'?'selected':''}>Not yet tested</option>
+        <option value="assumed" ${st==='assumed'?'selected':''}>Assumed</option>
+        <option value="demonstrated" ${st==='demonstrated'?'selected':''}>Demonstrated</option>
+      </select></td></tr>`;
+  }).join('');
+}
+
+/* ---- coverage (order ≤ 2) ---- */
+function coverage(){
+  const set = cutSets.filter(c=>c.order<=2);
+  const demo = set.filter(c=>testState[c.key]==='demonstrated').length;
+  const assumed = set.filter(c=>testState[c.key]==='assumed').length;
+  const untested = set.length - demo - assumed;
+  const pct = set.length ? Math.round(100*demo/set.length) : 0;
+  return {total:set.length, demo, assumed, untested, pct,
+          spof:set.filter(c=>c.order===1).length};
+}
+function renderCoverage(){
+  const c=coverage();
+  document.getElementById('covFill').style.width = c.pct+'%';
+  document.getElementById('covFill').style.background = c.pct>=100?'var(--ok)':c.pct>=50?'var(--ord2)':'var(--lost)';
+  document.getElementById('covLine').innerHTML = c.total
+    ? `<b>${c.demo} of ${c.total}</b> order-≤2 redundancy proofs demonstrated — <b>${c.pct}%</b>.`
+       + (c.spof?` Includes <b style="color:var(--spof)">${c.spof}</b> single point(s) of failure that no test can satisfy — these need design review, not just demonstration.`:'')
+    : `No order-≤2 cut sets to prove at this depth.`;
+  document.getElementById('covBreak').innerHTML =
+    `<span><span style="color:var(--ok)">●</span> Demonstrated <b>${c.demo}</b></span>`
+    + `<span><span style="color:var(--ord2)">●</span> Assumed <b>${c.assumed}</b></span>`
+    + `<span><span style="color:var(--ord3)">●</span> Not tested <b>${c.untested}</b></span>`;
+}
+
+/* ---- selection caption + sync visual selection without re-render ---- */
+function renderSelCap(){
+  const el=document.getElementById('selcap');
+  if(!selectedKey){ el.className='selcap empty'; el.textContent='No cut set selected — tap one in the panel or the test matrix to highlight it here.'; return; }
+  const c=cutSets.find(x=>x.key===selectedKey);
+  if(!c){ selectedKey=null; return renderSelCap(); }
+  const sc=scenarioFor(c);
+  const col = c.order===1?'var(--spof)':c.order===2?'var(--ord2)':'var(--ord3)';
+  el.className='selcap';
+  el.innerHTML = `<b style="color:${col}">Order ${c.order} cut set:</b> ${c.members.map(shortName).join(' + ')}<br>
+    <span style="color:var(--muted)">${svgEsc(sc.scn)}</span>
+    <div class="btnrow">
+      <button id="simBtn">Simulate this failure</button>
+      <button id="clearSelBtn">Clear selection</button>
+    </div>`;
+  document.getElementById('simBtn').onclick = ()=>{ manualDown = new Set(c.members); renderLive(); };
+  document.getElementById('clearSelBtn').onclick = ()=>{ selectedKey=null; renderSelectionVisuals(); renderSVG(); renderSelCap(); };
+}
+function renderSelectionVisuals(){
+  document.querySelectorAll('.cs-chip').forEach(ch=>ch.classList.toggle('sel', ch.dataset.key===selectedKey));
+  document.querySelectorAll('#mxBody tr').forEach(tr=>tr.classList.toggle('sel', tr.dataset.key===selectedKey));
+}
+function selectCut(key){
+  selectedKey = (selectedKey===key)?null:key;
+  renderSelectionVisuals(); renderSVG(); renderSelCap();
+}
+
+/* ---- assumptions panel ---- */
+function renderAssumptions(){
+  const edgeTxt = topo.edges.map(([u,v])=>`${shortName(u)} → ${shortName(v)}`).join('; ');
+  document.getElementById('assume').innerHTML = `
+    <li><b>Illustrative edges (CONFIRM):</b> ${svgEsc(edgeTxt)}.</li>
+    <li><b>Shared upstream (the planted SPOF):</b> both catcher buses are fed through one AMCOP → CUPP-MBP chain, so both show as order-1 cut sets. If the as-built feeds the two buses independently, edit the wiring and they vanish.</li>
+    <li><b>DLB simplification:</b> DLB (load-shed / generator protection) is modelled but left out of the series supply path — it is not treated as an in-line cut candidate here. Confirm whether any DLB action can interrupt the COP feed.</li>
+    <li><b>GENAN:</b> passive switchgear furniture, commissioned = false — excluded as a fault candidate, treated as always-up structure.</li>
+    <li><b>Load exclusion:</b> COP (the load) is not itself a fault candidate; a "cut set" is upstream failures that cut its supply.</li>
+    <li><b>ATS rule:</b> AMCOP passes power iff it is up AND at least one input source reaches it.</li>
+    <li><b>Verified facts kept:</b> COP fed ONLY by BUS 1.1C / BUS 2.1C; CUPP-MBP feeds CUPS and CUPP-XFMR in parallel; COP survives on ≥1 live catcher bus.</li>`;
+}
+
+/* ---- light re-render (toggle only changes live state, not the proof) ---- */
+function renderLive(){ renderBanner(); renderSVG(); }
+/* ---- full re-render (topology / depth changed) ---- */
+function recomputeAll(){
+  adj = buildAdj(topo.edges); nodes = topo.nodes; loadId = findLoad(nodes);
+  // keep only still-valid failures / selection
+  const ids = new Set(nodes.map(n=>n.id));
+  manualDown = new Set([...manualDown].filter(id=>ids.has(id)));
+  cutSets = findMinimalCutSets(nodes, adj, loadId, maxOrder);
+  if(selectedKey && !cutSets.some(c=>c.key===selectedKey)) selectedKey=null;
+  computeLayout();
+  renderBanner(); renderStats(); renderSVG(); renderLegend();
+  renderCutSets(); renderMatrix(); renderCoverage(); renderSelCap(); renderAssumptions();
+  renderSelectionVisuals();
+}
+
+/* ===========================================================================
+   5) WIRING UP THE UI
+   =========================================================================== */
+// diagram: tap node to fail/restore
+document.getElementById('svg').addEventListener('click', e=>{
+  const g = e.target.closest('[data-id]'); if(!g) return;
+  const id = g.dataset.id;
+  if(manualDown.has(id)) manualDown.delete(id); else manualDown.add(id);
+  renderLive();
+});
+document.getElementById('clearFail').onclick = ()=>{ manualDown=new Set(); renderLive(); };
+document.getElementById('maxOrder').onchange = e=>{ maxOrder=parseInt(e.target.value,10); recomputeAll(); };
+
+// cut-set chips
+document.getElementById('cutsets').addEventListener('click', e=>{
+  const chip=e.target.closest('.cs-chip'); if(chip) selectCut(chip.dataset.key);
+});
+
+// matrix: row select + inline edits
+const mxBody=document.getElementById('mxBody');
+mxBody.addEventListener('click', e=>{
+  if(e.target.closest('input,select,button')) return;
+  const tr=e.target.closest('tr[data-key]'); if(tr) selectCut(tr.dataset.key);
+});
+mxBody.addEventListener('change', e=>{
+  const key=e.target.closest('tr')?.dataset.key; if(!key) return;
+  if(e.target.dataset.field==='state'){ testState[key]=e.target.value; e.target.className='st-'+e.target.value; renderCoverage(); renderStats(); }
+  if(e.target.dataset.field==='testid'){ testIds[key]=e.target.value; }
+});
+
+// Procore CSV overlay
+function normStatus(s){
+  s=(s||'').trim().toLowerCase();
+  if(['demonstrated','demo','done','pass','passed','complete','completed','yes'].includes(s)) return 'demonstrated';
+  if(['assumed','assume','partial','inferred'].includes(s)) return 'assumed';
+  if(['not tested','not yet tested','untested','none','no','tbd',''].includes(s)) return 'untested';
+  return null;
+}
+document.getElementById('applyCsv').onclick = ()=>{
+  const errEl=document.getElementById('csvErr'); errEl.style.display='none';
+  const lines=document.getElementById('csv').value.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  let matched=0; const problems=[];
+  for(const line of lines){
+    const parts=line.split(/[,;\t]/).map(p=>p.trim());
+    if(parts.length<2){ problems.push(`"${line}" — need id,status`); continue; }
+    const id=parts[0], status=normStatus(parts.slice(1).join(','));
+    if(status===null){ problems.push(`"${line}" — unknown status "${parts.slice(1).join(',')}"`); continue; }
+    let hit=false;
+    for(const c of cutSets){
+      if(c.key===id || (testIds[c.key]&&testIds[c.key]===id) || c.members.includes(id)){ testState[c.key]=status; hit=true; matched++; }
+    }
+    if(!hit) problems.push(`"${id}" — no matching cut set / asset / test id`);
+  }
+  recomputeAll();
+  if(problems.length){ errEl.style.display='block'; errEl.textContent=`Applied ${matched} update(s). Issues:\n• `+problems.join('\n• '); }
+};
+document.getElementById('csvDemoAll').onclick = ()=>{ cutSets.filter(c=>c.order===2).forEach(c=>testState[c.key]='demonstrated'); recomputeAll(); };
+document.getElementById('csvReset').onclick = ()=>{ Object.keys(testState).forEach(k=>delete testState[k]); recomputeAll(); };
+
+// topology editor
+function topoToText(t){
+  const n=t.nodes.map(x=>`    { id:${JSON.stringify(x.id)}, type:${JSON.stringify(x.type)}, label:${JSON.stringify(x.label)}, commissioned:${x.commissioned} }`).join(',\n');
+  const e=t.edges.map(x=>`    [${JSON.stringify(x[0])}, ${JSON.stringify(x[1])}]`).join(',\n');
+  return `{\n  nodes: [\n${n}\n  ],\n  edges: [\n${e}\n  ]\n}`;
+}
+document.getElementById('topoEditor').value = topoToText(SEED_TOPOLOGY);
+document.getElementById('applyTopo').onclick = ()=>{
+  const errEl=document.getElementById('topoErr'); errEl.style.display='none';
+  let parsed;
+  try{ parsed = (new Function('return ('+document.getElementById('topoEditor').value+')'))(); }
+  catch(err){ errEl.style.display='block'; errEl.textContent='Parse error: '+err.message; return; }
+  const v = validateTopo(parsed);
+  if(v){ errEl.style.display='block'; errEl.textContent=v; return; }
+  topo = clone(parsed); recomputeAll();
+};
+document.getElementById('resetTopo').onclick = ()=>{
+  topo = clone(SEED_TOPOLOGY);
+  document.getElementById('topoEditor').value = topoToText(SEED_TOPOLOGY);
+  document.getElementById('topoErr').style.display='none';
+  manualDown=new Set(); selectedKey=null; recomputeAll();
+};
+function validateTopo(t){
+  if(!t || !Array.isArray(t.nodes) || !Array.isArray(t.edges)) return 'Topology must have arrays "nodes" and "edges".';
+  const ids=new Set();
+  for(const n of t.nodes){
+    if(!n||typeof n.id!=='string') return 'Every node needs a string id.';
+    if(ids.has(n.id)) return 'Duplicate node id: '+n.id;
+    ids.add(n.id);
+    if(typeof n.type!=='string') return 'Node '+n.id+' needs a type.';
+    if(typeof n.commissioned!=='boolean') return 'Node '+n.id+' needs commissioned:true/false.';
+  }
+  if(![...t.nodes].some(n=>n.type==='load')) return 'Need exactly one node with type "load" (the protected load).';
+  if(t.nodes.filter(n=>n.type==='load').length>1) return 'Model supports a single load node.';
+  if(!t.nodes.some(n=>n.type==='source')) return 'Need at least one node with type "source".';
+  for(const e of t.edges){
+    if(!Array.isArray(e)||e.length!==2) return 'Each edge must be a [from,to] pair.';
+    if(!ids.has(e[0])) return 'Edge references unknown node: '+e[0];
+    if(!ids.has(e[1])) return 'Edge references unknown node: '+e[1];
+  }
+  return null;
+}
+
+/* ===========================================================================
+   6) BOOT
+   =========================================================================== */
+(function boot(){
+  const r=runSelfTest();
+  const badge=document.getElementById('selftest');
+  if(r.ok){ badge.className='selftest pass'; badge.textContent='engine self-test: PASS'; }
+  else { badge.className='selftest fail'; badge.textContent='engine self-test: FAIL — see console'; }
+  recomputeAll();
+})();
+</script>
+</body>
+</html>
