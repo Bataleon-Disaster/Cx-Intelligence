@@ -1,0 +1,1078 @@
+<title>FORGE — Commissioning Intelligence for Hyperscale</title>
+<meta name="description" content="Construction tells you what's built. FORGE tells you whether you'll hand over on time. Asset-level readiness, cascade impact, and locked predictions for hyperscale commissioning programmes." />
+<style>
+  :root{
+    /* ground — near-black, faint cool bias */
+    --bg:#06070a; --bg2:#090b10; --panel:#0e1017; --panel2:#12141c;
+    --line:rgba(255,255,255,.08); --line2:rgba(255,255,255,.15);
+    --ink:#e9ecf2; --muted:#8b93a3; --dim:#5b6273;
+    /* neon accents — sparingly */
+    --teal:#34e5d0; --pink:#ff4d9d; --purple:#ad8bff; --amber:#f5b13c;
+    --green:#46e08a; --red:#ff5f6d;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,"Cascadia Code",Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  @media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--sans);
+    line-height:1.5; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  ::selection{background:rgba(52,229,208,.25);color:#fff}
+  a{color:inherit;text-decoration:none}
+  h1,h2,h3{margin:0;text-wrap:balance;letter-spacing:-.01em;font-weight:700}
+  p{margin:0}
+  hr{border:none;border-top:1px solid var(--line);margin:0}
+
+  /* ---------- shared atoms ---------- */
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+  .mono{font-family:var(--mono)}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--dim)}
+  .lede{color:var(--muted);font-size:clamp(15px,1.6vw,18px);line-height:1.6;max-width:60ch}
+  .tag{font-family:var(--mono);font-size:10.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+
+  /* status chips — the house system */
+  .chip{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-weight:600;
+    font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;padding:3px 9px;border-radius:999px;
+    border:1px solid var(--c,rgba(255,255,255,.2));color:var(--c,#fff);
+    background:color-mix(in srgb,var(--c,#888) 12%,transparent);white-space:nowrap}
+  .chip .dot{width:6px;height:6px;border-radius:50%;background:var(--c,#888);box-shadow:0 0 8px var(--c,#888)}
+  .c-notready{--c:#8790a3} .c-atrisk{--c:var(--amber)} .c-cxready{--c:var(--teal)}
+  .c-handed{--c:var(--green)} .c-regressed{--c:var(--red)} .c-fod{--c:var(--pink)}
+  .c-synthetic{--c:var(--purple)}
+
+  /* pill buttons (top-right chrome + CTAs) */
+  .pill{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12px;
+    letter-spacing:.04em;padding:8px 15px;border-radius:999px;border:1px solid var(--line2);
+    background:rgba(255,255,255,.03);color:var(--ink);cursor:pointer;transition:border-color .18s,background .18s,transform .18s}
+  .pill:hover{border-color:var(--teal);background:rgba(52,229,208,.06)}
+  .pill:active{transform:translateY(1px)}
+  .pill .dot{width:7px;height:7px;border-radius:50%}
+  .pill.primary{border-color:rgba(52,229,208,.5);background:rgba(52,229,208,.1);color:#c9fff6}
+  .pill.primary:hover{background:rgba(52,229,208,.16);box-shadow:0 0 0 1px rgba(52,229,208,.25),0 8px 30px -12px rgba(52,229,208,.5)}
+  .btn-lg{padding:13px 22px;font-size:13.5px}
+  :focus-visible{outline:2px solid var(--teal);outline-offset:3px;border-radius:6px}
+
+  /* ---------- top nav / product chrome ---------- */
+  header.nav{position:sticky;top:0;z-index:60;background:rgba(6,7,10,.72);
+    backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+  .nav-in{max-width:var(--maxw);margin:0 auto;padding:11px 22px;display:flex;align-items:center;gap:20px}
+  .brand{display:flex;flex-direction:column;line-height:1.15;flex-shrink:0}
+  .brand b{font-size:16px;letter-spacing:.16em;font-weight:800}
+  .brand .crumb{font-family:var(--mono);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-top:2px}
+  .brand b .fx{color:var(--teal)}
+  nav.links{display:flex;gap:22px;margin-left:8px;flex-wrap:wrap}
+  nav.links a{font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);transition:color .15s;position:relative;padding:4px 0}
+  nav.links a:hover{color:var(--ink)}
+  nav.links a::after{content:"";position:absolute;left:0;bottom:-2px;height:1px;width:0;background:var(--teal);transition:width .2s}
+  nav.links a:hover::after{width:100%}
+  .nav-cta{margin-left:auto;display:flex;gap:9px;flex-shrink:0}
+  @media(max-width:920px){nav.links{display:none}}
+  @media(max-width:680px){.brand .crumb{display:none}}
+  @media(max-width:620px){.nav-cta .pill.secondary{display:none}}
+
+  /* ---------- section frame ---------- */
+  section{position:relative;padding:clamp(64px,9vw,120px) 0}
+  .sec-head{display:flex;flex-direction:column;gap:14px;margin-bottom:44px;max-width:720px}
+  .sec-head h2{font-size:clamp(26px,3.6vw,42px);line-height:1.08}
+  .sec-head .kick{color:var(--teal)}
+  .divider{max-width:var(--maxw);margin:0 auto}
+
+  /* ---------- hero ---------- */
+  .hero{padding:clamp(52px,8vw,96px) 0 clamp(60px,8vw,104px);overflow:hidden}
+  #heroCanvas{position:absolute;inset:0;width:100%;height:100%;z-index:0;opacity:.9}
+  .hero .veil{position:absolute;inset:0;z-index:1;pointer-events:none;
+    background:radial-gradient(120% 90% at 78% 8%,transparent 0%,rgba(6,7,10,.35) 46%,var(--bg) 82%),
+      linear-gradient(180deg,rgba(6,7,10,.55),transparent 26%,transparent 70%,var(--bg))}
+  .hero-in{position:relative;z-index:2}
+  .hero h1{font-size:clamp(33px,6vw,68px);line-height:1.02;letter-spacing:-.025em;font-weight:800;max-width:16ch}
+  .hero h1 .lo{color:var(--muted);font-weight:700}
+  .hero h1 .hi{color:var(--teal)}
+  .hero .sub{margin-top:24px;font-size:clamp(15px,1.9vw,20px);color:var(--muted);max-width:56ch;line-height:1.55}
+  .hero .cta{margin-top:36px;display:flex;gap:12px;flex-wrap:wrap}
+  .hero .fine{margin-top:26px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;color:var(--dim);font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase}
+  .hero .stat-strip{margin-top:52px;display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+    background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .hero .stat-strip .s{background:var(--panel);padding:18px 20px}
+  .hero .stat-strip .v{font-family:var(--mono);font-size:clamp(19px,2.5vw,26px);font-weight:600;font-variant-numeric:tabular-nums}
+  .hero .stat-strip .l{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);margin-top:6px}
+  @media(max-width:720px){.hero .stat-strip{grid-template-columns:repeat(2,1fr)}}
+
+  /* ---------- generic panels/cards ---------- */
+  .grid{display:grid;gap:18px}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  @media(max-width:900px){.g3{grid-template-columns:1fr}.g2{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px}
+  .panel:hover{border-color:var(--line2)}
+  .panel .ph{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+  .panel h3{font-size:18px;letter-spacing:-.01em}
+  .panel p{color:var(--muted);font-size:14.5px;line-height:1.6}
+  .idx{font-family:var(--mono);font-size:11px;letter-spacing:.2em;color:var(--dim)}
+
+  /* ---------- browser-chrome frame ---------- */
+  .frame{border:1px solid var(--line2);border-radius:16px;overflow:hidden;background:var(--bg2);
+    box-shadow:0 40px 90px -50px rgba(0,0,0,.9)}
+  .frame-bar{display:flex;align-items:center;gap:12px;padding:11px 15px;background:#0a0c11;border-bottom:1px solid var(--line)}
+  .frame-dots{display:flex;gap:7px}
+  .frame-dots i{width:11px;height:11px;border-radius:50%;background:#232733;display:block}
+  .frame-url{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em;
+    background:#0d0f15;border:1px solid var(--line);border-radius:7px;padding:4px 12px;flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frame-body{padding:20px}
+  @media(max-width:560px){.frame-body{padding:14px}}
+
+  /* feature block layout */
+  .feature{display:grid;grid-template-columns:0.86fr 1.14fr;gap:40px;align-items:center}
+  .feature.rev{grid-template-columns:1.14fr 0.86fr}
+  .feature.rev .feat-copy{order:2}
+  @media(max-width:960px){.feature,.feature.rev{grid-template-columns:1fr;gap:26px}.feature.rev .feat-copy{order:0}}
+  .feat-copy h3{font-size:clamp(22px,2.8vw,30px);line-height:1.12;margin:14px 0 16px}
+  .feat-copy p{color:var(--muted);line-height:1.65;max-width:46ch}
+  .feat-list{list-style:none;padding:0;margin:20px 0 0;display:flex;flex-direction:column;gap:10px}
+  .feat-list li{position:relative;padding-left:18px;font-size:14px;color:var(--muted);line-height:1.55}
+  .feat-list li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:2px;background:var(--kc,var(--teal));box-shadow:0 0 8px var(--kc,var(--teal))}
+  .feat-list li b{color:var(--ink);font-weight:600}
+  .feature-space{display:flex;flex-direction:column;gap:clamp(72px,11vw,132px)}
+
+  /* ---------- readiness board widget ---------- */
+  .rb-tabs{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px}
+  .rb-tab{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    padding:7px 12px;border-radius:9px;border:1px solid var(--line);background:transparent;color:var(--muted);cursor:pointer;
+    display:inline-flex;gap:8px;align-items:center;transition:.15s}
+  .rb-tab:hover{border-color:var(--line2);color:var(--ink)}
+  .rb-tab.on{background:rgba(255,255,255,.05);border-color:var(--line2);color:var(--ink)}
+  .rb-tab .n{font-variant-numeric:tabular-nums;color:var(--teal);font-weight:700}
+  .rb-tab.on .n{color:inherit}
+  .rb-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px}
+  table.rb{border-collapse:collapse;width:100%;min-width:660px;font-size:12.5px}
+  table.rb th{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--dim);text-align:left;padding:11px 14px;background:#0b0d13;border-bottom:1px solid var(--line);position:sticky;top:0;font-weight:500}
+  table.rb td{padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+  table.rb tbody tr:last-child td{border-bottom:none}
+  table.rb tbody tr{transition:background .12s}
+  table.rb tbody tr:hover{background:rgba(255,255,255,.025)}
+  table.rb .asset{font-family:var(--mono);color:var(--ink);font-weight:600;letter-spacing:.02em}
+  table.rb .sys{color:var(--muted);font-family:var(--mono);font-size:11px}
+  .pct{display:inline-flex;align-items:center;gap:9px;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .pct .track{width:56px;height:5px;border-radius:99px;background:#161922;overflow:hidden}
+  .pct .track i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--teal),#1fbfae)}
+  .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+  .snag.hot{color:var(--red)} .snag.warn{color:var(--amber)}
+  .rb-empty{padding:34px 14px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:12px;letter-spacing:.05em}
+  .rb-foot{margin-top:12px;font-family:var(--mono);font-size:10.5px;letter-spacing:.06em;color:var(--dim);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+
+  /* ---------- cascade widget ---------- */
+  .cascade-ctl{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-end;margin-bottom:22px}
+  .field{display:flex;flex-direction:column;gap:8px}
+  .field label{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  select.src{font-family:var(--mono);font-size:13px;background:#0c0e14;color:var(--ink);border:1px solid var(--line2);
+    border-radius:9px;padding:9px 12px;cursor:pointer}
+  .slip-field{flex:1;min-width:240px}
+  .slip-top{display:flex;justify-content:space-between;align-items:baseline}
+  .slip-val{font-family:var(--mono);font-size:20px;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:5px;border-radius:99px;
+    background:linear-gradient(90deg,var(--amber) var(--fill,0%),#1a1d26 var(--fill,0%));outline:none;margin-top:4px}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+    background:#fff;border:3px solid var(--amber);cursor:pointer;box-shadow:0 0 0 4px rgba(245,177,60,.18)}
+  input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--amber);cursor:pointer}
+
+  .chain{display:flex;gap:0;overflow-x:auto;-webkit-overflow-scrolling:touch;padding:6px 2px 14px}
+  .node{flex:0 0 auto;min-width:132px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;
+    padding:13px;position:relative;transition:border-color .2s,box-shadow .2s}
+  .node.shift{border-color:rgba(245,177,60,.5);box-shadow:0 0 0 1px rgba(245,177,60,.15)}
+  .node.breach{border-color:rgba(255,95,109,.6);box-shadow:0 0 0 1px rgba(255,95,109,.2),0 10px 30px -14px rgba(255,95,109,.5)}
+  .node .nl{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .node .nt{font-family:var(--mono);font-size:14px;font-weight:700;margin-top:5px}
+  .node .nd{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
+  .node .delta{font-family:var(--mono);font-size:11px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums;min-height:14px}
+  .node .delta.up{color:var(--amber)} .node .delta.bad{color:var(--red)} .node .delta.zero{color:var(--dim)}
+  .connector{flex:0 0 auto;align-self:center;width:26px;height:2px;position:relative;background:var(--line2);margin:0 -1px}
+  .connector.live{background:linear-gradient(90deg,var(--amber),var(--red))}
+  .connector::after{content:"";position:absolute;right:-1px;top:50%;transform:translateY(-50%);
+    border-left:6px solid var(--line2);border-top:4px solid transparent;border-bottom:4px solid transparent}
+  .connector.live::after{border-left-color:var(--red)}
+
+  .cascade-out{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-top:18px}
+  .cascade-out .o{background:var(--panel2);padding:15px 16px}
+  .cascade-out .ol{font-family:var(--mono);font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim)}
+  .cascade-out .ov{font-family:var(--mono);font-size:clamp(17px,2vw,22px);font-weight:700;margin-top:7px;font-variant-numeric:tabular-nums}
+  @media(max-width:760px){.cascade-out{grid-template-columns:repeat(2,1fr)}}
+  .cod-note{margin-top:14px;font-size:12.5px;color:var(--muted);line-height:1.6;font-family:var(--mono)}
+  .cod-note b{color:var(--ink)}
+
+  /* ---------- prediction log widget ---------- */
+  .pl-head{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:18px}
+  .pl-acc{display:flex;align-items:baseline;gap:10px}
+  .pl-acc .big{font-family:var(--mono);font-size:34px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;line-height:1}
+  .pl-acc .cap{font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);max-width:16ch;line-height:1.4}
+  .pl-legend{margin-left:auto;display:flex;gap:14px;font-family:var(--mono);font-size:10.5px;color:var(--muted);flex-wrap:wrap}
+  .pl-legend span{display:inline-flex;gap:6px;align-items:center}
+  .pl-legend i{width:8px;height:8px;border-radius:2px;display:block}
+  .pl-list{display:flex;flex-direction:column;gap:8px;max-height:none}
+  .pl-row{display:grid;grid-template-columns:132px 1fr auto;gap:16px;align-items:center;
+    background:var(--panel2);border:1px solid var(--line);border-left-width:3px;border-radius:10px;padding:12px 15px}
+  .pl-row.hit{border-left-color:var(--green)} .pl-row.miss{border-left-color:var(--red)} .pl-row.open{border-left-color:var(--purple)}
+  .pl-when{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.03em}
+  .pl-when b{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+  .pl-claim{font-size:13px;line-height:1.5}
+  .pl-claim .a{font-family:var(--mono);color:var(--ink);font-weight:600}
+  .pl-claim .d{color:var(--muted)}
+  .pl-claim .conf{font-family:var(--mono);color:var(--teal);font-weight:600}
+  .pl-right{text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+  @media(max-width:640px){.pl-row{grid-template-columns:1fr;gap:9px}.pl-right{align-items:flex-start;text-align:left}}
+  .lockline{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--dim);margin-top:14px;display:flex;align-items:center;gap:8px}
+  .lockline::before{content:"🔒";filter:grayscale(1) brightness(1.4);font-size:11px}
+
+  /* ---------- bridge section ---------- */
+  .bridge{background:
+    radial-gradient(80% 60% at 20% 0%,rgba(173,139,255,.06),transparent 60%),
+    radial-gradient(70% 60% at 90% 100%,rgba(52,229,208,.05),transparent 60%);
+    border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .bridge-grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+  @media(max-width:900px){.bridge-grid{grid-template-columns:1fr;gap:32px}}
+  .bridge h2{font-size:clamp(26px,3.6vw,40px);line-height:1.08;margin-bottom:18px}
+  .bridge p{color:var(--muted);line-height:1.7;margin-bottom:14px;max-width:52ch}
+  .bridge p b{color:var(--ink);font-weight:600}
+  .flow{display:flex;flex-direction:column;gap:0}
+  .flow-node{border:1px solid var(--line);border-radius:12px;padding:15px 18px;background:var(--panel);position:relative}
+  .flow-node .fl{font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim)}
+  .flow-node .ft{font-size:15px;font-weight:600;margin-top:5px}
+  .flow-node .fd{color:var(--muted);font-size:13px;margin-top:5px;line-height:1.5}
+  .flow-arrow{align-self:center;color:var(--dim);font-family:var(--mono);font-size:16px;padding:7px 0}
+  .flow-node.verified{border-color:rgba(52,229,208,.4);background:linear-gradient(180deg,rgba(52,229,208,.05),var(--panel))}
+  .flow-node.verified .ft{color:var(--teal)}
+  .stamp{display:inline-flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+  .stamp .st{font-family:var(--mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+
+  /* ---------- how it runs ---------- */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;counter-reset:step}
+  @media(max-width:900px){.steps{grid-template-columns:1fr}}
+  .step{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:24px;position:relative}
+  .step .sn{font-family:var(--mono);font-size:12px;letter-spacing:.2em;color:var(--teal)}
+  .step h3{font-size:18px;margin:12px 0 10px}
+  .step p{color:var(--muted);font-size:14px;line-height:1.6}
+  .step .k{font-family:var(--mono);font-size:11px;color:var(--dim);margin-top:14px;display:block;letter-spacing:.05em}
+  .norip{margin-top:26px;border:1px solid var(--line);border-radius:12px;padding:16px 20px;background:var(--panel);
+    display:flex;gap:12px;align-items:center;font-size:14px;color:var(--muted)}
+  .norip b{color:var(--ink)}
+  .norip .chip{flex-shrink:0}
+
+  /* ---------- pricing ---------- */
+  .price-anchor{border:1px solid rgba(245,177,60,.35);background:rgba(245,177,60,.05);border-radius:14px;
+    padding:18px 22px;margin-bottom:34px;display:flex;gap:14px;align-items:center;font-size:15px;line-height:1.5}
+  .price-anchor .ico{font-family:var(--mono);color:var(--amber);font-size:13px;letter-spacing:.14em;flex-shrink:0}
+  .price-anchor b{color:var(--ink)}
+  .offers{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:stretch}
+  @media(max-width:900px){.offers{grid-template-columns:1fr}}
+  .offer{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:26px;display:flex;flex-direction:column;position:relative}
+  .offer.feat{border-color:rgba(52,229,208,.45);background:linear-gradient(180deg,rgba(52,229,208,.055),var(--panel) 40%);
+    box-shadow:0 30px 80px -50px rgba(52,229,208,.6)}
+  .offer .rec{position:absolute;top:-11px;left:26px;font-family:var(--mono);font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+    background:var(--teal);color:#04120f;font-weight:700;padding:4px 10px;border-radius:99px}
+  .offer .oname{font-family:var(--mono);font-size:12px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted)}
+  .offer.feat .oname{color:var(--teal)}
+  .offer .otag{font-size:14px;color:var(--muted);margin-top:10px;line-height:1.5;min-height:42px}
+  .offer .oprice{font-family:var(--mono);font-size:22px;font-weight:700;margin:18px 0 4px;line-height:1.2}
+  .offer .oprice .u{font-size:12px;color:var(--dim);font-weight:400}
+  .offer .osub{font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.04em}
+  .offer ul{list-style:none;padding:0;margin:20px 0 22px;display:flex;flex-direction:column;gap:11px;flex:1}
+  .offer li{position:relative;padding-left:18px;font-size:13.5px;color:var(--muted);line-height:1.5}
+  .offer li::before{content:"›";position:absolute;left:0;top:0;color:var(--teal);font-family:var(--mono)}
+  .offer li b{color:var(--ink);font-weight:600}
+  .offer .pill{justify-content:center;width:100%}
+  .offer .quote{font-family:var(--mono);font-size:12px;color:var(--ink);font-style:normal;border-left:2px solid var(--teal);padding-left:12px;margin:4px 0 4px;line-height:1.5}
+
+  /* ---------- proof strip ---------- */
+  .proof{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--bg2)}
+  .proof-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:44px;align-items:center}
+  @media(max-width:860px){.proof-grid{grid-template-columns:1fr;gap:30px}}
+  .proof-claims{display:flex;flex-direction:column;gap:16px}
+  .proof-claims .pc{display:flex;gap:14px;align-items:baseline}
+  .proof-claims .pc .m{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:var(--dim);text-transform:uppercase;flex:0 0 108px;padding-top:2px}
+  .proof-claims .pc p{font-size:15px;color:var(--ink);line-height:1.5}
+  .accslot{border:1px dashed var(--line2);border-radius:16px;padding:26px;text-align:center;background:rgba(173,139,255,.04)}
+  .accslot .cap{font-family:var(--mono);font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim)}
+  .accslot .big{font-family:var(--mono);font-size:clamp(40px,7vw,62px);font-weight:800;color:var(--purple);margin:10px 0 4px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .accslot .ph{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em}
+  .accslot .note{font-size:11.5px;color:var(--dim);margin-top:12px;line-height:1.5}
+
+  /* ---------- footer ---------- */
+  footer{padding:clamp(70px,10vw,120px) 0 44px;position:relative;overflow:hidden}
+  .foot-cta{text-align:center;max-width:760px;margin:0 auto}
+  .foot-cta h2{font-size:clamp(28px,4.5vw,52px);line-height:1.05;letter-spacing:-.02em}
+  .foot-cta h2 .hl{color:var(--teal)}
+  .foot-cta p{color:var(--muted);margin-top:18px;font-size:16px}
+  .foot-cta .cta{margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .foot-meta{max-width:var(--maxw);margin:clamp(64px,9vw,110px) auto 0;padding:26px 22px 0;border-top:1px solid var(--line);
+    display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;align-items:center}
+  .foot-meta .brand b{font-size:15px}
+  .foot-meta .legal{font-family:var(--mono);font-size:10.5px;color:var(--dim);letter-spacing:.06em;line-height:1.7;text-align:right}
+  .foot-meta a.contact{color:var(--teal);font-family:var(--mono);font-size:12px;letter-spacing:.04em}
+  @media(max-width:600px){.foot-meta{flex-direction:column;align-items:flex-start}.foot-meta .legal{text-align:left}}
+
+  /* reveal-on-scroll */
+  .rv{opacity:0;transform:translateY(18px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  .rv.in{opacity:1;transform:none}
+  @media (prefers-reduced-motion:reduce){.rv{opacity:1;transform:none;transition:none}}
+</style>
+
+<!-- ======================= NAV ======================= -->
+<header class="nav">
+  <div class="nav-in">
+    <a class="brand" href="#top" aria-label="FORGE home">
+      <b>FOR<span class="fx">G</span>E</b>
+      <span class="crumb">Commissioning Intelligence · Hyperscale</span>
+    </a>
+    <nav class="links" aria-label="Sections">
+      <a href="#problem">Problem</a>
+      <a href="#platform">Platform</a>
+      <a href="#bridge">Bridge</a>
+      <a href="#run">How it runs</a>
+      <a href="#pricing">Engagement</a>
+    </nav>
+    <div class="nav-cta">
+      <a href="#pricing" class="pill secondary">Run a pilot</a>
+      <a href="#platform" class="pill primary"><span class="dot" style="background:var(--teal)"></span>See the live demo</a>
+    </div>
+  </div>
+</header>
+
+<!-- ======================= HERO ======================= -->
+<span id="top"></span>
+<section class="hero">
+  <canvas id="heroCanvas" aria-hidden="true"></canvas>
+  <div class="veil"></div>
+  <div class="wrap hero-in">
+    <p class="eyebrow">Construction → Commissioning · Asset-level truth</p>
+    <h1 style="margin-top:20px">
+      <span class="lo">Construction tells you what's built.</span><br>
+      FORGE tells you whether you'll <span class="hi">hand over on time.</span>
+    </h1>
+    <p class="sub">Asset-level readiness, cascade impact, and locked predictions for hyperscale commissioning programmes.</p>
+    <div class="cta">
+      <a href="#platform" class="pill primary btn-lg"><span class="dot" style="background:var(--teal)"></span>See the live demo</a>
+      <a href="#pricing" class="pill btn-lg">Run a pilot →</a>
+    </div>
+    <div class="fine">
+      <span class="chip c-synthetic"><span class="dot"></span>Synthetic dataset</span>
+      <span>Every figure, tag &amp; date on this page is synthetic · no client, employer or project named</span>
+    </div>
+
+    <div class="stat-strip" aria-hidden="true">
+      <div class="s"><div class="v" style="color:var(--teal)">1,284</div><div class="l">Assets tracked to depth</div></div>
+      <div class="s"><div class="v" style="color:var(--amber)">L2 → L5</div><div class="l">Test states per asset</div></div>
+      <div class="s"><div class="v" style="color:var(--pink)">Append-only</div><div class="l">Locked prediction log</div></div>
+      <div class="s"><div class="v" style="color:var(--purple)">Daily</div><div class="l">Readiness truth</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PROBLEM ======================= -->
+<hr class="divider">
+<section id="problem">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <p class="eyebrow">The gap between built and handed over</p>
+      <h2>A commissioning programme runs on three <span class="kick">unchecked assumptions</span>.</h2>
+      <p class="lede">Each one feels fine on the programme call. Each one is why handover dates move in the last eight weeks, when there is nothing left to give.</p>
+    </div>
+    <div class="grid g3">
+      <div class="panel rv">
+        <div class="ph"><span class="idx">PROMISE</span><span class="chip c-notready"><span class="dot"></span>Unverified</span></div>
+        <h3>Dates set on faith</h3>
+        <p>CX start dates are declared off construction completeness that nobody has verified at asset level. "The hall will be ready" is a promise made upstream and inherited downstream — no one walked it, asset by asset, to confirm it. FORGE does.</p>
+      </div>
+      <div class="panel rv">
+        <div class="ph"><span class="idx">CASCADE</span><span class="chip c-atrisk"><span class="dot"></span>At risk</span></div>
+        <h3>One slip, silent</h3>
+        <p>An accelerator node slips a week. Downstream, its L3 live test, the integrated L4, the block's L5 IST and two H2C milestones move with it — quietly. By the time it lands on a status deck, the date it threatens has already gone.</p>
+      </div>
+      <div class="panel rv">
+        <div class="ph"><span class="idx">SCOREKEEPING</span><span class="chip c-regressed"><span class="dot"></span>Unfalsifiable</span></div>
+        <h3>"On track" proves nothing</h3>
+        <p>Nobody keeps score on their own forecasts. Last month's confident "on track" is never checked against what actually happened, so it can never be wrong. FORGE locks every forecast before the outcome — the record can't be edited after the fact.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PLATFORM ======================= -->
+<hr class="divider">
+<section id="platform">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <p class="eyebrow">The platform · runs on synthetic programme data</p>
+      <h2>Three surfaces. One <span class="kick">source of truth</span> for the programme.</h2>
+      <p class="lede">Not a dashboard bolted onto a tracker. A model of every asset, its dependency chain, and a forecasting record that holds itself to account. The panels below are live — drive them.</p>
+    </div>
+
+    <div class="feature-space">
+
+      <!-- FEATURE 1 · READINESS BOARD -->
+      <div class="feature rv">
+        <div class="feat-copy">
+          <span class="eyebrow" style="color:var(--teal)">01 · Readiness Board</span>
+          <h3>Asset-level truth, surfaced daily</h3>
+          <p>Construction %, open snags, clean / FOD state and the next test milestone — for every asset, refreshed daily. The board doesn't ask you to read it top to bottom. It tells you what blocks CX <em>today</em>.</p>
+          <ul class="feat-list">
+            <li><b>Blocking CX Today</b> — assets on the critical path that aren't clear to start test</li>
+            <li><b>FOD Next 48h</b> — foreign object debris risk before a live energisation window</li>
+            <li><b>Regressed</b> — anything that went backwards since yesterday, flagged loudly</li>
+            <li><b>Slips This Week</b> — every asset whose milestone date moved, and by how much</li>
+          </ul>
+        </div>
+        <div class="frame">
+          <div class="frame-bar">
+            <div class="frame-dots"><i></i><i></i><i></i></div>
+            <span class="frame-url">forge://programme/DH-02/readiness · row 5</span>
+            <span class="chip c-synthetic"><span class="dot"></span>Synthetic</span>
+          </div>
+          <div class="frame-body">
+            <div class="rb-tabs" id="rbTabs"></div>
+            <div class="rb-scroll">
+              <table class="rb">
+                <thead><tr>
+                  <th>Asset</th><th>System</th><th>Constr.</th><th style="text-align:right">Snags</th><th>Clean</th><th>Next test</th><th>Status</th>
+                </tr></thead>
+                <tbody id="rbBody"></tbody>
+              </table>
+            </div>
+            <div class="rb-foot"><span id="rbCount">—</span><span>DH-02 · L0 hall · refreshed 06:00 daily</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEATURE 2 · CASCADE -->
+      <div class="feature rev rv">
+        <div class="feat-copy">
+          <span class="eyebrow" style="color:var(--amber)">02 · Cascade</span>
+          <h3>Slip one asset. Watch the date move.</h3>
+          <p>Pick any asset, drag the what-if slider, and FORGE propagates the slip through the real dependency chain — L3, L4, L5, H2C and PFHO — consuming programme float until handover itself moves. With cost-of-delay attached to every day.</p>
+          <ul class="feat-list" style="--kc:var(--amber)">
+            <li><b>Real dependency chains</b>, not a Gantt bar dragged by hand</li>
+            <li><b>Float made visible</b> — see exactly how many days the programme has left to absorb</li>
+            <li><b>Cost of delay per day</b>, so the trade-off is priced, not argued</li>
+          </ul>
+        </div>
+        <div class="frame">
+          <div class="frame-bar">
+            <div class="frame-dots"><i></i><i></i><i></i></div>
+            <span class="frame-url">forge://programme/DH-02/cascade · what-if</span>
+            <span class="chip c-synthetic"><span class="dot"></span>Synthetic</span>
+          </div>
+          <div class="frame-body">
+            <div class="cascade-ctl">
+              <div class="field">
+                <label for="srcSel">Slip source asset</label>
+                <select class="src" id="srcSel"></select>
+              </div>
+              <div class="field slip-field">
+                <div class="slip-top">
+                  <label for="slip">What-if slip</label>
+                  <span class="slip-val" id="slipVal">0 days</span>
+                </div>
+                <input type="range" id="slip" min="0" max="21" step="1" value="0" aria-label="What-if slip in days">
+              </div>
+            </div>
+            <div class="chain" id="chain"></div>
+            <div class="cascade-out">
+              <div class="o"><div class="ol">Float remaining</div><div class="ov" id="oFloat">—</div></div>
+              <div class="o"><div class="ol">H2C moves</div><div class="ov" id="oH2c">—</div></div>
+              <div class="o"><div class="ol">PFHO date</div><div class="ov" id="oPfho">—</div></div>
+              <div class="o"><div class="ol">Cost of delay</div><div class="ov" id="oCost">—</div></div>
+            </div>
+            <p class="cod-note" id="codNote"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- FEATURE 3 · PREDICTION LOG -->
+      <div class="feature rv">
+        <div class="feat-copy">
+          <span class="eyebrow" style="color:var(--pink)">03 · Prediction Log</span>
+          <h3>The thing no dashboard has: a track record</h3>
+          <p>Every handover forecast is timestamped and <b>locked before the outcome is known</b>. Append-only — nothing is edited after the result lands. Over a programme it becomes an auditable accuracy record: proof that FORGE doesn't just track, it predicts, and shows how often it was right.</p>
+          <ul class="feat-list" style="--kc:var(--pink)">
+            <li><b>Locked before outcome</b> — the timestamp is the proof</li>
+            <li><b>Append-only</b> — a hit stays a hit, a miss stays a miss</li>
+            <li><b>Running accuracy</b>, carried across the whole programme</li>
+          </ul>
+        </div>
+        <div class="frame">
+          <div class="frame-bar">
+            <div class="frame-dots"><i></i><i></i><i></i></div>
+            <span class="frame-url">forge://programme/DH-02/predictions · append-only</span>
+            <span class="chip c-synthetic"><span class="dot"></span>Synthetic</span>
+          </div>
+          <div class="frame-body">
+            <div class="pl-head">
+              <div class="pl-acc">
+                <span class="big" id="plAcc">—</span>
+                <span class="cap">Accuracy on resolved forecasts</span>
+              </div>
+              <div class="pl-legend">
+                <span><i style="background:var(--green)"></i>Hit</span>
+                <span><i style="background:var(--red)"></i>Miss</span>
+                <span><i style="background:var(--purple)"></i>Locked · open</span>
+              </div>
+            </div>
+            <div class="pl-list" id="plList"></div>
+            <div class="lockline">Entries are written at lock time and never edited — outcomes append below the forecast</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ======================= BRIDGE ======================= -->
+<section id="bridge" class="bridge">
+  <div class="wrap">
+    <div class="bridge-grid">
+      <div class="rv">
+        <p class="eyebrow" style="color:var(--purple)">The wedge · construction → commissioning</p>
+        <h2 style="margin-top:14px">Make the CX start date a confirmed date, not a hope.</h2>
+        <p>Today, CX readiness is declared off construction completeness that <b>nobody verified at asset level</b>. A percentage rolls up a hierarchy, someone signs a date, and the whole commissioning programme is planned against it.</p>
+        <p>FORGE verifies it where it actually lives — at the asset. Construction status is <b>versioned, owner-stamped and evidence-backed</b>: a photo, a signed check, a clean certificate against each step. When FORGE says an asset is ready for CX, that claim has a name and a timestamp behind it.</p>
+        <p>So the CX start date stops being an upstream promise and becomes a downstream fact you can plan on.</p>
+      </div>
+      <div class="flow rv">
+        <div class="flow-node">
+          <div class="fl">Today · construction hand-off</div>
+          <div class="ft">"Hall is 96% complete"</div>
+          <div class="fd">A rolled-up percentage. No line of sight to which 4% is left, or whether any of it blocks CX.</div>
+        </div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-node verified">
+          <div class="fl">With FORGE · verified at asset depth</div>
+          <div class="ft">"41 of 43 assets CX-ready · 2 blocking"</div>
+          <div class="fd">Each ready state is confirmed against evidence, by an owner, at a version you can point to.</div>
+          <div class="stamp">
+            <span class="st">Construction %</span><span class="st">Snags cleared</span><span class="st">Clean / FOD</span><span class="st">Evidence attached</span><span class="st">Owner-stamped</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= HOW IT RUNS ======================= -->
+<hr class="divider">
+<section id="run">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <p class="eyebrow">How it runs</p>
+      <h2>Sits on top of what the programme <span class="kick">already uses</span>.</h2>
+      <p class="lede">No rip-and-replace. No new system for the field to learn. FORGE ingests what the programme already produces and returns readiness truth from day one.</p>
+    </div>
+    <div class="steps">
+      <div class="step rv">
+        <div class="sn">STEP 01</div>
+        <h3>Ingest</h3>
+        <p>Pull straight from your existing document control and tracker exports — Procore, the CX tracker, the snag register. FORGE reads what's there; nobody re-keys anything.</p>
+        <span class="k">Procore · CxAlloy · tracker exports · snag registers</span>
+      </div>
+      <div class="step rv">
+        <div class="sn">STEP 02</div>
+        <h3>Model</h3>
+        <p>Assets are modelled with their real dependency chains — electrical, mechanical, network — so a slip on one is understood in terms of everything downstream, not in isolation.</p>
+        <span class="k">Assets · dependencies · L2–L5 test states · H2C / PFHO</span>
+      </div>
+      <div class="step rv">
+        <div class="sn">STEP 03</div>
+        <h3>Run</h3>
+        <p>Daily readiness truth from day one. The board surfaces blockers, the cascade prices slips, and the prediction log starts keeping score the moment the first forecast is locked.</p>
+        <span class="k">Daily board · live cascade · locked forecasts</span>
+      </div>
+    </div>
+    <div class="norip rv">
+      <span class="chip c-cxready"><span class="dot"></span>No rip &amp; replace</span>
+      <span><b>FORGE is a programme-intelligence layer, not a field tool.</b> It doesn't compete with the systems your teams already live in — it reads them and makes them predictive.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= ENGAGEMENT & PRICING ======================= -->
+<hr class="divider">
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <p class="eyebrow">Engagement · pilot-first</p>
+      <h2>Start with proof, not a <span class="kick">subscription</span>.</h2>
+      <p class="lede">We don't sell seats and we don't licence programmes we haven't proven on. The front door is a pilot: one programme, a locked forecast, a documented result.</p>
+    </div>
+
+    <div class="price-anchor rv">
+      <span class="ico">COST OF DELAY</span>
+      <span>A single week of slip on a <b>60&nbsp;MW facility</b> costs the owner more than a <b>year of FORGE</b>. Everything below is priced against that number.</span>
+    </div>
+
+    <div class="offers">
+      <!-- PILOT -->
+      <div class="offer feat rv">
+        <span class="rec">Recommended · front door</span>
+        <div class="oname">Pilot</div>
+        <div class="otag">One programme, stood up on live data, with a forecast made at the start and scored at the end.</div>
+        <div class="oprice">Fixed fee<span class="u"> · scoped to the programme</span></div>
+        <div class="osub">One programme · 8–12 weeks</div>
+        <ul>
+          <li>Readiness board + cascade stood up on <b>live programme data</b></li>
+          <li>A <b>locked set of handover predictions</b> made at the start</li>
+          <li>A <b>documented accuracy result</b> at the end — hit or miss</li>
+          <li>Fixed scope, fixed fee — no open-ended engagement</li>
+        </ul>
+        <div class="quote">"One programme. One locked forecast. One documented result."</div>
+        <a href="#footcta" class="pill primary" style="margin-top:18px"><span class="dot" style="background:var(--teal)"></span>Run a pilot</a>
+      </div>
+
+      <!-- EMBEDDED -->
+      <div class="offer rv">
+        <div class="oname">Embedded</div>
+        <div class="otag">FORGE plus an embedded commissioning specialist, running readiness inside the programme day to day.</div>
+        <div class="oprice">Day-rate + platform<span class="u"> · enquire</span></div>
+        <div class="osub">Highest-certainty deployment</div>
+        <ul>
+          <li>The platform arrives <b>with the operator who built it</b></li>
+          <li>Readiness run day to day — not handed over and left</li>
+          <li>Cascade and predictions maintained live by a specialist</li>
+          <li>For programmes that can't afford to get handover wrong</li>
+        </ul>
+        <a href="#footcta" class="pill" style="margin-top:18px">Enquire →</a>
+      </div>
+
+      <!-- PROGRAMME LICENCE -->
+      <div class="offer rv">
+        <div class="oname">Programme Licence</div>
+        <div class="otag">Annual, per active programme or campus — a programme-intelligence layer, not a per-seat field tool.</div>
+        <div class="oprice">From £60k<span class="u"> /yr per programme</span></div>
+        <div class="osub">Scales to £120k/yr with cascade + prediction log</div>
+        <ul>
+          <li>Priced <b>per programme</b>, not per seat — unlimited users</li>
+          <li>Cascade and prediction-log capability scale the price</li>
+          <li><b>Follows a completed pilot</b> — we don't licence unproven</li>
+          <li>Renews annually per active programme / campus</li>
+        </ul>
+        <a href="#footcta" class="pill" style="margin-top:18px">Talk licensing →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= PROOF ======================= -->
+<section class="proof">
+  <div class="wrap">
+    <div class="proof-grid">
+      <div class="proof-claims rv">
+        <p class="eyebrow" style="margin-bottom:6px">Credibility · unbragging</p>
+        <div class="pc"><span class="m">Origin</span><p>Built inside a live hyperscale programme — not a lab.</p></div>
+        <div class="pc"><span class="m">Adoption</span><p>Methodology adopted at programme level.</p></div>
+        <div class="pc"><span class="m">Data</span><p>Every demo runs on synthetic data. Always.</p></div>
+        <div class="pc"><span class="m">Integrity</span><p>Every prediction is locked before the outcome.</p></div>
+      </div>
+      <div class="accslot rv">
+        <div class="cap">Prediction accuracy · per programme</div>
+        <div class="big">—<span style="font-size:.5em">%</span></div>
+        <div class="ph">[ accrues once a programme resolves ]</div>
+        <div class="note">The number that matters is real, not synthetic — so it's left blank until a live programme's locked forecasts resolve. The demo log above shows the mechanism; this slot holds the score.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================= FOOTER CTA ======================= -->
+<hr class="divider">
+<footer id="footcta">
+  <div class="wrap">
+    <div class="foot-cta rv">
+      <p class="eyebrow" style="justify-content:center">Handover</p>
+      <h2 style="margin-top:16px">Your handover date is a prediction.<br><span class="hl">Make it a good one.</span></h2>
+      <p>Stand FORGE up on one programme. Lock the forecast at the start. Read the result at the end.</p>
+      <div class="cta">
+        <a href="mailto:hello@forge.build?subject=FORGE%20pilot%20enquiry" class="pill primary btn-lg"><span class="dot" style="background:var(--teal)"></span>Run a pilot</a>
+        <a href="mailto:hello@forge.build?subject=FORGE%20demo" class="pill btn-lg">Book the live demo →</a>
+      </div>
+    </div>
+  </div>
+  <div class="foot-meta">
+    <div class="brand">
+      <b>FOR<span style="color:var(--teal)">G</span>E</b>
+      <span class="crumb mono" style="font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--dim);margin-top:3px">Commissioning intelligence for hyperscale programmes</span>
+      <a class="contact" href="mailto:hello@forge.build" style="margin-top:10px">hello@forge.build</a>
+    </div>
+    <div class="legal">
+      SYNTHETIC DATASET THROUGHOUT · NO CLIENT, EMPLOYER OR PROJECT NAMED<br>
+      All asset tags, dates &amp; figures are illustrative · © FORGE
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion:reduce)").matches;
+
+  /* ---------------- reveal on scroll (sweep — can't skip on fast scroll) ---------------- */
+  var rvs = [].slice.call(document.querySelectorAll(".rv"));
+  if(reduce){
+    rvs.forEach(function(n){ n.classList.add("in"); });
+  } else {
+    var ticking=false;
+    function sweep(){
+      ticking=false;
+      var vh=window.innerHeight||document.documentElement.clientHeight;
+      for(var i=rvs.length-1;i>=0;i--){
+        var r=rvs[i].getBoundingClientRect();
+        if(r.top < vh*0.92 && r.bottom > -40){ rvs[i].classList.add("in"); rvs.splice(i,1); }
+      }
+    }
+    function onScroll(){ if(!ticking){ ticking=true; requestAnimationFrame(sweep); } }
+    window.addEventListener("scroll",onScroll,{passive:true});
+    window.addEventListener("resize",onScroll,{passive:true});
+    window.addEventListener("hashchange",onScroll);
+    window.addEventListener("load",onScroll);
+    sweep(); setTimeout(sweep,120); setTimeout(sweep,600);
+  }
+
+  /* ================= READINESS BOARD ================= */
+  // synthetic assets — DH-02 hall
+  var ASSETS = [
+    {a:"UPS-C A",   sys:"Electrical", c:100, snag:1, clean:"CLEAN", next:"L4 INTEGRATED", st:"cxready"},
+    {a:"UPS-C B",   sys:"Electrical", c:98,  snag:3, clean:"CLEAN", next:"L3 LIVE",       st:"atrisk", buckets:["slip"]},
+    {a:"SDB 01A1",  sys:"Electrical", c:100, snag:0, clean:"CLEAN", next:"HANDED OVER",   st:"handed"},
+    {a:"SDB 01B2",  sys:"Electrical", c:92,  snag:6, clean:"FOD",   next:"L2 DEAD",       st:"notready", buckets:["block","fod"]},
+    {a:"CDP 01A",   sys:"Electrical", c:100, snag:2, clean:"CLEAN", next:"L5 IST",        st:"cxready"},
+    {a:"RB-1",      sys:"Reserve bus",c:100, snag:0, clean:"CLEAN", next:"L4 INTEGRATED", st:"cxready"},
+    {a:"ACCEL 09",  sys:"IT / compute",c:88, snag:9, clean:"FOD",   next:"L2 DEAD",       st:"regressed", buckets:["block","fod","regress","slip"]},
+    {a:"CRAH-3",    sys:"Mechanical", c:95,  snag:4, clean:"CLEAN", next:"L3 LIVE",       st:"atrisk", buckets:["block","slip"]},
+    {a:"AHU set 2", sys:"Mechanical", c:100, snag:1, clean:"CLEAN", next:"L5 IST",        st:"cxready"},
+    {a:"EF col 4",  sys:"Mechanical", c:90,  snag:5, clean:"FOD",   next:"L2 DEAD",       st:"notready", buckets:["fod"]},
+    {a:"GEN-01",    sys:"Standby",    c:100, snag:0, clean:"CLEAN", next:"HANDED OVER",   st:"handed"},
+    {a:"ATS-05",    sys:"Electrical", c:97,  snag:2, clean:"CLEAN", next:"L4 INTEGRATED", st:"atrisk", buckets:["regress"]},
+    {a:"BMS-01",    sys:"Controls",   c:84,  snag:11,clean:"CLEAN", next:"L3 LIVE",       st:"notready", buckets:["block","slip"]},
+    {a:"CDP 01B",   sys:"Electrical", c:100, snag:1, clean:"CLEAN", next:"L5 IST",        st:"cxready"}
+  ];
+  var CHIP = {
+    notready:["c-notready","Not ready"], atrisk:["c-atrisk","At risk"],
+    cxready:["c-cxready","CX ready"], handed:["c-handed","Handed over"], regressed:["c-regressed","Regressed"]
+  };
+  var BUCKETS = [
+    {k:"block",   label:"Blocking CX Today", f:function(x){return (x.buckets||[]).indexOf("block")>-1;}},
+    {k:"fod",     label:"FOD Next 48h",      f:function(x){return (x.buckets||[]).indexOf("fod")>-1;}},
+    {k:"regress", label:"Regressed",         f:function(x){return (x.buckets||[]).indexOf("regress")>-1;}},
+    {k:"slip",    label:"Slips This Week",   f:function(x){return (x.buckets||[]).indexOf("slip")>-1;}},
+    {k:"all",     label:"All assets",        f:function(){return true;}}
+  ];
+  var curBucket = "block";
+  var tabsEl = document.getElementById("rbTabs");
+  var bodyEl = document.getElementById("rbBody");
+  var countEl = document.getElementById("rbCount");
+
+  function renderTabs(){
+    tabsEl.innerHTML = "";
+    BUCKETS.forEach(function(b){
+      var n = ASSETS.filter(b.f).length;
+      var btn = document.createElement("button");
+      btn.className = "rb-tab" + (b.k===curBucket?" on":"");
+      btn.type = "button";
+      btn.innerHTML = b.label + ' <span class="n">'+n+'</span>';
+      btn.addEventListener("click", function(){ curBucket=b.k; renderTabs(); renderRows(); });
+      tabsEl.appendChild(btn);
+    });
+  }
+  function chipHTML(st){ var c=CHIP[st]; return '<span class="chip '+c[0]+'"><span class="dot"></span>'+c[1]+'</span>'; }
+  function renderRows(){
+    var b = BUCKETS.filter(function(x){return x.k===curBucket;})[0];
+    var rows = ASSETS.filter(b.f);
+    bodyEl.innerHTML = "";
+    if(!rows.length){
+      bodyEl.innerHTML = '<tr><td colspan="7"><div class="rb-empty">— nothing in this bucket · clear —</div></td></tr>';
+    } else {
+      rows.forEach(function(x){
+        var snagCls = x.snag>=6?"hot":(x.snag>=3?"warn":"");
+        var cleanChip = x.clean==="FOD"
+          ? '<span class="chip c-fod"><span class="dot"></span>FOD</span>'
+          : '<span class="tag" style="color:var(--muted)">CLEAN</span>';
+        var tr = document.createElement("tr");
+        tr.innerHTML =
+          '<td class="asset">'+x.a+'</td>'+
+          '<td class="sys">'+x.sys+'</td>'+
+          '<td><span class="pct">'+x.c+'%<span class="track"><i style="width:'+x.c+'%"></i></span></span></td>'+
+          '<td class="num snag '+snagCls+'">'+x.snag+'</td>'+
+          '<td>'+cleanChip+'</td>'+
+          '<td class="mono" style="font-size:11px;color:var(--muted)">'+x.next+'</td>'+
+          '<td>'+chipHTML(x.st)+'</td>';
+        bodyEl.appendChild(tr);
+      });
+    }
+    countEl.textContent = rows.length + (rows.length===1?" asset":" assets") + " · " + b.label.toLowerCase();
+  }
+  renderTabs(); renderRows();
+
+  /* ================= CASCADE ================= */
+  var MS = 86400000;
+  function fmt(d){
+    var m=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return String(d.getUTCDate()).padStart(2,"0")+" "+m[d.getUTCMonth()]+" "+String(d.getUTCFullYear()).slice(2);
+  }
+  // base milestone dates (synthetic) — UTC anchored so no runtime drift
+  var BASE = {
+    l2:  Date.UTC(2026,7,3),   // 03 Aug 26
+    l3:  Date.UTC(2026,7,24),
+    l4:  Date.UTC(2026,8,14),
+    l5:  Date.UTC(2026,9,5),
+    h2c: Date.UTC(2026,9,19),
+    pfho:Date.UTC(2026,9,30)
+  };
+  var FLOAT_DAYS = 5;                 // programme float protecting handover
+  var COST_PER_DAY = 185000;          // £/day cost of delay on a 60MW facility
+  var SOURCES = [
+    {v:"accel", label:"ACCEL 09 · L2 dead test", from:"l2"},
+    {v:"crah",  label:"CRAH-3 · L3 live test",   from:"l3"},
+    {v:"ups",   label:"UPS-C B · L4 integrated", from:"l4"},
+    {v:"sdb",   label:"SDB 01B2 · L2 dead test", from:"l2"}
+  ];
+  var ORDER = ["l2","l3","l4","l5","h2c","pfho"];
+  var NODEMETA = {
+    l2:{lab:"L2 · Dead",name:"DEAD TEST"}, l3:{lab:"L3 · Live",name:"LIVE TEST"},
+    l4:{lab:"L4 · Integr.",name:"INTEGRATED"}, l5:{lab:"L5 · IST",name:"IST"},
+    h2c:{lab:"Milestone",name:"H2C"}, pfho:{lab:"Handover",name:"PFHO"}
+  };
+  var srcSel=document.getElementById("srcSel"), slip=document.getElementById("slip"),
+      slipVal=document.getElementById("slipVal"), chainEl=document.getElementById("chain");
+  SOURCES.forEach(function(s){ var o=document.createElement("option"); o.value=s.v; o.textContent=s.label; srcSel.appendChild(o); });
+
+  function currency(n){
+    if(n>=1e6) return "£"+(n/1e6).toFixed(n>=1e7?1:2)+"m";
+    if(n>=1e3) return "£"+Math.round(n/1e3)+"k";
+    return "£"+n;
+  }
+  function renderCascade(){
+    var s = parseInt(slip.value,10);
+    var src = SOURCES.filter(function(x){return x.v===srcSel.value;})[0];
+    var fromIdx = ORDER.indexOf(src.from);
+    slipVal.textContent = s + (s===1?" day":" days");
+    slip.style.setProperty("--fill",(s/21*100)+"%");
+
+    var handoverSlip = Math.max(0, s - FLOAT_DAYS);       // float absorbs first days
+    var floatLeft = Math.max(0, FLOAT_DAYS - s);
+
+    chainEl.innerHTML = "";
+    ORDER.forEach(function(k,i){
+      if(i>0){
+        var c=document.createElement("div");
+        c.className="connector"+(s>0 && i>fromIdx?" live":"");
+        chainEl.appendChild(c);
+      }
+      var affected = i>=fromIdx && s>0;
+      // downstream test nodes move by full slip; h2c/pfho protected by float
+      var moved = 0;
+      if(affected){ moved = (k==="h2c"||k==="pfho") ? handoverSlip : s; }
+      var breach = (k==="h2c"||k==="pfho") && handoverSlip>0;
+      var d = new Date(BASE[k] + moved*MS);
+      var node=document.createElement("div");
+      node.className="node"+(moved>0?(breach?" breach":" shift"):"");
+      var meta=NODEMETA[k];
+      var deltaCls = moved===0?"zero":(breach?"bad":"up");
+      var deltaTxt = moved>0? "+"+moved+"d" : (affected?"absorbed":"·");
+      node.innerHTML =
+        '<div class="nl">'+meta.lab+'</div>'+
+        '<div class="nt">'+meta.name+'</div>'+
+        '<div class="nd">'+fmt(d)+'</div>'+
+        '<div class="delta '+deltaCls+'">'+deltaTxt+'</div>';
+      chainEl.appendChild(node);
+    });
+
+    // outputs
+    document.getElementById("oFloat").innerHTML = floatLeft>0
+      ? '<span style="color:var(--teal)">'+floatLeft+'d</span>'
+      : '<span style="color:var(--red)">0d · gone</span>';
+    document.getElementById("oH2c").innerHTML = handoverSlip>0
+      ? '<span style="color:var(--red)">+'+handoverSlip+'d</span>'
+      : '<span style="color:var(--teal)">on plan</span>';
+    document.getElementById("oPfho").innerHTML = handoverSlip>0
+      ? '<span style="color:var(--red)">'+fmt(new Date(BASE.pfho+handoverSlip*MS))+'</span>'
+      : '<span style="color:var(--ink)">'+fmt(new Date(BASE.pfho))+'</span>';
+    var cost = handoverSlip*COST_PER_DAY;
+    document.getElementById("oCost").innerHTML = cost>0
+      ? '<span style="color:var(--red)">'+currency(cost)+'</span>'
+      : '<span style="color:var(--dim)">£0</span>';
+
+    var note=document.getElementById("codNote");
+    if(s===0){
+      note.innerHTML = "Drag the slider. FORGE propagates the slip through the chain and shows exactly when it starts costing money.";
+    } else if(handoverSlip===0){
+      note.innerHTML = 'Slip of <b>'+s+'d</b> absorbed by programme float — handover holds, but you have <b>'+floatLeft+'d</b> left before it bites.';
+    } else {
+      note.innerHTML = 'Float exhausted. Handover moves <b>'+handoverSlip+'d</b> to <b>'+fmt(new Date(BASE.pfho+handoverSlip*MS))+'</b> — a cost of delay of <b>'+currency(cost)+'</b> at £185k/day.';
+    }
+  }
+  srcSel.addEventListener("change",renderCascade);
+  slip.addEventListener("input",renderCascade);
+  renderCascade();
+
+  /* ================= PREDICTION LOG ================= */
+  // synthetic, append-only. lock date precedes outcome. resolved => hit/miss.
+  var PRED = [
+    {lock:"2026-05-12 08:00", asset:"BLOCK DH-02", claim:"PFHO by 30 Oct 26", conf:78, res:"hit",  out:"Handed over 28 Oct 26 · 2d early"},
+    {lock:"2026-05-12 08:00", asset:"UPS-C B",     claim:"L4 by 14 Sep 26",   conf:64, res:"miss", out:"Slipped to 19 Sep 26 · +5d"},
+    {lock:"2026-05-26 08:00", asset:"CRAH-3",      claim:"L3 live by 24 Aug 26",conf:71,res:"hit",  out:"Live 23 Aug 26 · on plan"},
+    {lock:"2026-06-09 08:00", asset:"ACCEL 09",    claim:"L2 dead by 03 Aug 26",conf:52,res:"miss", out:"FOD re-work · L2 to 12 Aug 26"},
+    {lock:"2026-06-23 08:00", asset:"SDB 01A1",    claim:"Handover by 30 Jun 26",conf:88,res:"hit", out:"Handed over 30 Jun 26"},
+    {lock:"2026-07-07 08:00", asset:"BLOCK DH-02", claim:"H2C by 19 Oct 26",   conf:69, res:"open", out:"Locked · outcome pending"},
+    {lock:"2026-07-14 08:00", asset:"BMS-01",      claim:"L3 live by 12 Sep 26",conf:47, res:"open", out:"Locked · outcome pending"}
+  ];
+  var listEl=document.getElementById("plList");
+  var resolved = PRED.filter(function(p){return p.res!=="open";});
+  var hits = resolved.filter(function(p){return p.res==="hit";}).length;
+  var acc = resolved.length? Math.round(hits/resolved.length*100):0;
+  var accEl=document.getElementById("plAcc");
+
+  PRED.slice().reverse().forEach(function(p){
+    var badge = p.res==="hit"?'<span class="chip c-handed"><span class="dot"></span>Hit</span>'
+             : p.res==="miss"?'<span class="chip c-regressed"><span class="dot"></span>Miss</span>'
+             : '<span class="chip c-synthetic"><span class="dot"></span>Locked</span>';
+    var row=document.createElement("div");
+    row.className="pl-row "+p.res;
+    row.innerHTML =
+      '<div class="pl-when">LOCKED<b>'+p.lock+'</b></div>'+
+      '<div class="pl-claim"><span class="a">'+p.asset+'</span> <span class="d">— '+p.claim+' · </span><span class="conf">'+p.conf+'% likely</span>'+
+        '<div class="pl-when" style="margin-top:5px">'+p.out+'</div></div>'+
+      '<div class="pl-right">'+badge+'</div>';
+    listEl.appendChild(row);
+  });
+  // count up accuracy on reveal
+  function countUp(){
+    if(reduce){ accEl.textContent=acc+"%"; return; }
+    var t0=null, dur=900;
+    function tick(ts){ if(!t0)t0=ts; var k=Math.min(1,(ts-t0)/dur);
+      accEl.textContent=Math.round(acc*(1-Math.pow(1-k,3)))+"%"; if(k<1)requestAnimationFrame(tick); }
+    requestAnimationFrame(tick);
+  }
+  if("IntersectionObserver" in window){
+    var io2=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){countUp();io2.disconnect();}});},{threshold:.4});
+    io2.observe(accEl);
+  } else { accEl.textContent=acc+"%"; }
+
+  /* ================= HERO CASCADE CANVAS ================= */
+  var cv=document.getElementById("heroCanvas"), ctx=cv.getContext("2d");
+  var W=0,H=0,DPR=1, nodes=[], edges=[], pulses=[], raf=null, lastWave=0;
+  var COLS=6, PER=[2,3,3,3,2,1]; // nodes per column, funnelling to a single handover
+  var ACC=["#34e5d0","#f5b13c","#ff4d9d","#ad8bff"];
+
+  function build(){
+    var r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+    DPR=Math.min(2,window.devicePixelRatio||1);
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+    nodes=[]; edges=[];
+    var padX=W*0.06, spanX=W*0.9, padY=H*0.14, spanY=H*0.72;
+    var colX=[];
+    for(var c=0;c<COLS;c++){ colX.push(padX + spanX*(c/(COLS-1))); }
+    for(var c2=0;c2<COLS;c2++){
+      var n=PER[c2];
+      for(var i=0;i<n;i++){
+        var y = n===1 ? padY+spanY*0.5 : padY + spanY*(i/(n-1));
+        // slight organic jitter based on index (deterministic)
+        var jx = Math.sin((c2*7+i*13))*6;
+        nodes.push({x:colX[c2]+jx, y:y, c:c2, i:i, lit:0, base:0.14+((i+c2)%3)*0.04});
+      }
+    }
+    // connect each node to 1–2 nodes in next column
+    var byCol=[]; for(var c3=0;c3<COLS;c3++){ byCol.push(nodes.filter(function(nn){return nn.c===c3;})); }
+    for(var c4=0;c4<COLS-1;c4++){
+      byCol[c4].forEach(function(a,ai){
+        var nxt=byCol[c4+1];
+        var t1=nxt[ai%nxt.length];
+        var t2=nxt[(ai+1)%nxt.length];
+        edges.push({a:a,b:t1}); if(t2!==t1 && Math.abs(ai%2)===0) edges.push({a:a,b:t2});
+      });
+    }
+  }
+  function idxOf(n){ return nodes.indexOf(n); }
+  function fireWave(t){
+    // start at a random-ish source in column 0 (deterministic-ish via time)
+    var sources=nodes.filter(function(n){return n.c===0;});
+    var src=sources[Math.floor((t/2600))%sources.length];
+    var color=ACC[Math.floor((t/2600))%ACC.length];
+    propagate(src,color,t,0);
+  }
+  function propagate(node,color,t,depth){
+    if(depth>COLS) return;
+    node.lit=1; node.litColor=color; node.litAt=t;
+    var outs=edges.filter(function(e){return e.a===node;});
+    outs.forEach(function(e){
+      pulses.push({a:node,b:e.b,color:color,start:t,dur:520});
+      // schedule downstream
+      pulses[pulses.length-1].onArrive=function(tt){ propagate(e.b,color,tt,depth+1); };
+    });
+  }
+  function frame(t){
+    ctx.clearRect(0,0,W,H);
+    if(t-lastWave>2600){ lastWave=t; fireWave(t); }
+    // edges (idle faint)
+    ctx.lineWidth=1;
+    edges.forEach(function(e){
+      ctx.strokeStyle="rgba(255,255,255,0.05)";
+      ctx.beginPath(); ctx.moveTo(e.a.x,e.a.y); ctx.lineTo(e.b.x,e.b.y); ctx.stroke();
+    });
+    // pulses
+    for(var p=pulses.length-1;p>=0;p--){
+      var pl=pulses[p], k=(t-pl.start)/pl.dur;
+      if(k>=1){ if(pl.onArrive){pl.onArrive(t); pl.onArrive=null;} pulses.splice(p,1); continue; }
+      var x=pl.a.x+(pl.b.x-pl.a.x)*k, y=pl.a.y+(pl.b.y-pl.a.y)*k;
+      // trailing glow line
+      ctx.strokeStyle=pl.color; ctx.globalAlpha=0.35*(1-k);
+      ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(pl.a.x,pl.a.y); ctx.lineTo(x,y); ctx.stroke();
+      ctx.globalAlpha=1;
+      ctx.fillStyle=pl.color; ctx.beginPath(); ctx.arc(x,y,2.2,0,6.283); ctx.fill();
+      ctx.globalAlpha=0.5; ctx.beginPath(); ctx.arc(x,y,5,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+    }
+    // nodes
+    nodes.forEach(function(n){
+      var lit=0, col="#5a6a8a";
+      if(n.lit>0){ var age=(t-n.litAt)/1400; if(age>=1){n.lit=0;} else { lit=1-age; col=n.litColor; } }
+      var pulse=n.base + 0.05*Math.sin(t*0.0015 + idxOf(n));
+      var rBase=1.8+pulse*3;
+      // glow when lit
+      if(lit>0){
+        ctx.globalAlpha=0.28*lit; ctx.fillStyle=col;
+        ctx.beginPath(); ctx.arc(n.x,n.y,10+lit*8,0,6.283); ctx.fill(); ctx.globalAlpha=1;
+      }
+      ctx.fillStyle = lit>0 ? col : "rgba(150,170,200,"+(0.22+pulse*0.4)+")";
+      ctx.beginPath(); ctx.arc(n.x,n.y,rBase+(lit*2.2),0,6.283); ctx.fill();
+    });
+    raf=requestAnimationFrame(frame);
+  }
+  function start(){
+    build();
+    if(reduce){
+      // static single frame
+      ctx.clearRect(0,0,W,H);
+      edges.forEach(function(e){ ctx.strokeStyle="rgba(255,255,255,0.06)"; ctx.beginPath(); ctx.moveTo(e.a.x,e.a.y); ctx.lineTo(e.b.x,e.b.y); ctx.stroke(); });
+      nodes.forEach(function(n){ ctx.fillStyle="rgba(52,229,208,0.5)"; ctx.beginPath(); ctx.arc(n.x,n.y,2.4,0,6.283); ctx.fill(); });
+      return;
+    }
+    if(raf) cancelAnimationFrame(raf);
+    lastWave=0; pulses=[]; raf=requestAnimationFrame(frame);
+  }
+  var rt;
+  window.addEventListener("resize",function(){ clearTimeout(rt); rt=setTimeout(start,180); });
+  // pause when hero off-screen
+  if("IntersectionObserver" in window){
+    var heroSec=document.querySelector(".hero");
+    var io3=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){ if(!reduce && !raf) { lastWave=0; raf=requestAnimationFrame(frame); } }
+        else { if(raf){ cancelAnimationFrame(raf); raf=null; } }
+      });
+    },{threshold:0.02});
+    io3.observe(heroSec);
+  }
+  start();
+})();
+</script>
