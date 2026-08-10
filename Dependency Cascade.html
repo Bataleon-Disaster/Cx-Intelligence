@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
+<title>Dependency Cascade — slip one asset, watch the date move</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --ink:#e9eef7; --muted:#9fb0c9;
+    --line:#22304c; --accent:#3b82f6;
+    --red:#ef4444; --red-bg:#3b1417; --amber:#f59e0b; --amber-bg:#3a2a0d;
+    --grey:#64748b; --grey-bg:#1b2538; --green:#22c55e; --green-bg:#10301c;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-text-size-adjust:100%;}
+  a{color:var(--accent)}
+  header{padding:14px 16px;background:linear-gradient(180deg,#0d1830,#0b1220);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:30}
+  header h1{margin:0;font-size:17px;letter-spacing:.2px}
+  header .sub{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.4}
+  main{max-width:1180px;margin:0 auto;padding:12px 12px 64px}
+  section{margin:12px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+  .card h2{margin:0 0 8px;font-size:13px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted)}
+
+  /* controls */
+  .ctl{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:6px;min-width:230px;flex:0 1 auto}
+  .field label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  select{background:#0a1322;color:var(--ink);border:1px solid var(--line);border-radius:8px;
+    padding:8px 10px;font-size:13px;max-width:320px}
+  .slip-field{flex:1 1 260px}
+  .slip-top{display:flex;justify-content:space-between;align-items:baseline}
+  .slip-val{font-weight:800;font-size:14px;color:var(--amber)}
+  input[type=range]{width:100%;accent-color:var(--amber)}
+  .btn{appearance:none;border:1px solid var(--line);background:#16233d;color:var(--ink);
+    border-radius:9px;padding:8px 12px;font-size:13px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#1d2f50}
+  .btn.ghost{background:transparent}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+  /* scenario chips */
+  #scenario{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}
+  .slipchip{appearance:none;cursor:pointer;font-size:12px;font-weight:700;
+    background:var(--amber-bg);color:#f7c768;border:1px solid #6a4d12;border-radius:99px;padding:4px 11px}
+  .slipchip:hover{background:#4a370f}
+  .slipchip b{margin-left:4px;opacity:.75}
+  .empty{color:var(--muted);font-size:12.5px;font-style:italic}
+
+  /* outputs */
+  .outs{display:flex;gap:10px;flex-wrap:wrap}
+  .metric{flex:1 1 150px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .metric .big{font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .metric .lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+  .good{color:#7ef0a8} .bad{color:#ff9aa0} .warn{color:#f7c768} .dim{color:var(--grey)}
+  #note{font-size:12.5px;color:var(--muted);line-height:1.5;margin:10px 2px 0}
+  #note b{color:var(--ink)}
+
+  /* diagram */
+  .diagram-wrap{position:relative;background:var(--panel2);border:1px solid var(--line);
+    border-radius:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+  svg#diagram{display:block;width:100%;height:auto;min-width:1100px}
+  .hint{font-size:11.5px;color:var(--muted);margin:6px 2px 0}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+  .legend i{width:12px;height:12px;border-radius:3px;display:inline-block;border:1px solid rgba(255,255,255,.25)}
+
+  /* impact table */
+  .tablewrap{overflow:auto;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;min-width:820px;font-size:12.5px}
+  th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+  th{position:sticky;top:0;background:#0e1830;color:var(--muted);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px}
+  tr.clickable{cursor:pointer}
+  tr.clickable:hover td{background:#13203a}
+  tr.shift td:first-child{border-left:3px solid var(--amber)}
+  tr.breach td:first-child{border-left:3px solid var(--red)}
+  td .sub{color:var(--muted);font-weight:400}
+  .warncell{color:#f7c768}
+  .tag{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:2px 8px;border-radius:99px;border:1px solid}
+  .tag.ok{background:var(--green-bg);color:#7ef0a8;border-color:#1c5236}
+  .tag.warn{background:var(--amber-bg);color:#f7c768;border-color:#6a4d12}
+  .tag.bad{background:var(--red-bg);color:#ff9aa0;border-color:#7a2228}
+  .dotc{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:6px;vertical-align:baseline}
+
+  /* assumptions */
+  details{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:0 12px}
+  details > summary{cursor:pointer;padding:11px 0;font-weight:700;font-size:13px;list-style:none}
+  details > summary::-webkit-details-marker{display:none}
+  details > summary::before{content:"▸ ";color:var(--muted)}
+  details[open] > summary::before{content:"▾ "}
+  details .body{padding:0 0 12px}
+  ul.notes{margin:6px 0;padding-left:18px}
+  ul.notes li{margin:4px 0;font-size:12.5px;line-height:1.5;color:var(--muted)}
+  ul.notes li b{color:var(--ink)}
+  .confirm{color:#f7c768;font-weight:700}
+  code{background:#0a1322;border:1px solid var(--line);border-radius:5px;padding:1px 5px;font-size:11.5px}
+  .ipnote{font-size:11px;color:var(--grey);text-align:center;margin:18px 0 0}
+
+  @media (max-width:560px){
+    header h1{font-size:15px}
+    .metric .big{font-size:18px}
+  }
+  @media print{
+    header{position:static}
+    .noprint{display:none !important}
+    body{background:#fff;color:#000}
+    .card,details{border-color:#bbb;background:#fff;color:#000}
+    .diagram-wrap{overflow:visible;border-color:#bbb}
+    svg#diagram{min-width:0}
+    .hint,.metric .lbl,#note{color:#333}
+    *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  }
+</style>
+<style id="svgcss">
+  .colhead{fill:#9fb0c9;font-size:11px;letter-spacing:.8px;text-transform:uppercase;font-weight:700;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .edge{fill:none;stroke:#22304c;stroke-width:1.6}
+  .edge.live{stroke:#f59e0b;stroke-width:2;stroke-dasharray:5 4}
+  .edge.chain{stroke:#ef4444;stroke-width:2.6}
+  .node rect{fill:#0e1626;stroke:#22304c;stroke-width:1.2}
+  .node.clickable{cursor:pointer}
+  .node.clickable:hover rect{fill:#13203a}
+  .node.shift rect{stroke:#f59e0b;stroke-width:1.8}
+  .node.breach rect{stroke:#ef4444;stroke-width:2.2}
+  .node.sel rect{stroke:#3b82f6;stroke-width:2.4}
+  .nlab{fill:#e9eef7;font-size:12.5px;font-weight:700;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .nname{fill:#9fb0c9;font-size:10.5px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .ndate{fill:#9fb0c9;font-size:11px;font-weight:600;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .node.shift .ndate{fill:#f7c768}
+  .node.breach .ndate{fill:#ff9aa0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Dependency Cascade <span style="color:var(--muted);font-weight:500">· slip one asset, watch the date move</span></h1>
+  <p class="sub"><span id="progMeta">—</span>. Slips propagate through the <b>real dependency chain</b> —
+  L3, L4, L5, H2C, PFHO — consuming float until handover itself moves. Synthetic data.</p>
+</header>
+
+<main>
+
+  <!-- What-if controls -->
+  <section class="card">
+    <h2>What-if scenario</h2>
+    <div class="ctl">
+      <div class="field">
+        <label for="srcSel">Slip source asset</label>
+        <select id="srcSel"></select>
+      </div>
+      <div class="field slip-field">
+        <div class="slip-top">
+          <label for="slip">What-if slip</label>
+          <span class="slip-val" id="slipVal">0 days</span>
+        </div>
+        <input type="range" id="slip" min="0" max="30" step="1" value="0" aria-label="What-if slip in days">
+      </div>
+      <button class="btn ghost" id="btnReset">Reset scenario</button>
+    </div>
+    <div id="scenario"></div>
+    <p id="note"></p>
+  </section>
+
+  <!-- Outputs -->
+  <section class="card">
+    <h2>Programme impact</h2>
+    <div class="outs">
+      <div class="metric"><div id="oFloat" class="big">—</div><div class="lbl">Float before handover moves</div></div>
+      <div class="metric"><div id="oH2c" class="big">—</div><div class="lbl">H2C moves</div></div>
+      <div class="metric"><div id="oPfho" class="big">—</div><div class="lbl">PFHO date</div></div>
+      <div class="metric"><div id="oCost" class="big">—</div><div class="lbl">Cost of delay</div></div>
+      <div class="metric"><div id="oImpact" class="big">—</div><div class="lbl">Assets that move</div></div>
+    </div>
+  </section>
+
+  <!-- Diagram -->
+  <section class="card">
+    <div class="toolbar noprint" style="margin-bottom:8px">
+      <h2 style="margin:0;flex:1 1 auto">Dependency chain — directed test prerequisites</h2>
+      <button class="btn" id="btnPng">Export PNG</button>
+      <button class="btn" id="btnPrint">Print / Save PDF</button>
+    </div>
+    <div class="diagram-wrap">
+      <svg id="diagram" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <p class="hint noprint">Tap an asset to select it, then drag the slip slider. Amber = date moves but handover holds ·
+      red = the chain that is moving handover. Hover an edge for its free float.</p>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <!-- Impact table -->
+  <section class="card">
+    <h2>Impact register — every asset, its forecast and its remaining float</h2>
+    <div class="tablewrap">
+      <table id="impact">
+        <thead><tr>
+          <th>Asset</th><th>System</th><th>Level</th><th>Plan finish</th><th>Forecast</th>
+          <th>Δ</th><th>Can absorb</th><th>Status</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="hint"><b>Can absorb</b> = how many more days that asset can slip before PFHO moves off its baseline —
+      its total float against handover, live under the current scenario.</p>
+  </section>
+
+  <!-- Assumptions -->
+  <section class="noprint">
+    <details>
+      <summary>Modelling assumptions — confirm these</summary>
+      <div class="body">
+        <ul class="notes">
+          <li><span class="confirm">CONFIRM AGAINST THE PROGRAMME.</span> Every date, duration and dependency in
+            <code>cascade-data.js</code> is <b>illustrative</b>. The graph is the one place the programme lives —
+            correct it there and the engine re-proves everything live.</li>
+          <li><b>Finish-to-start only:</b> a test starts at the later of its planned start and every prerequisite's
+            finish (+ lag). The gap between a prerequisite's planned finish and a successor's planned start is that
+            edge's <b>free float</b> — it absorbs slip silently, which is exactly why small slips look harmless.</li>
+          <li><b>Slips extend completion:</b> a slip of <i>n</i> days on an asset delays its finish by <i>n</i> days;
+            the forward pass propagates the consequence, never more, never less. Multiple simultaneous slips compose.</li>
+          <li><b>Zero-float edge by design:</b> the thermal run (<code>MECH L4</code>) cannot start before integrated
+            power (<code>ELEC L4</code>) proves — that edge carries no float, so ELEC L4 is always the sharpest lever.</li>
+          <li><b>H2C → PFHO move together:</b> the 11-day punch-clear window between them is a lag with zero float,
+            mirroring how the programme treats the pair.</li>
+          <li><b>Calendar days,</b> not working days — weekends are not modelled. Cost of delay is a flat
+            £185k/day applied to PFHO movement only.</li>
+        </ul>
+      </div>
+    </details>
+  </section>
+
+  <p class="ipnote">Personal methodology IP — standalone tool. Not for embedding in any client or third-party system.</p>
+
+</main>
+
+<script src="cascade-data.js"></script>
+<script src="cascade-app.js"></script>
+</body>
+</html>
